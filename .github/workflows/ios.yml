@@ -2,7 +2,7 @@ name: iOS build and tests
 
 on:
   push:
-    branches: [main, 'feature/**']
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -42,7 +42,29 @@ jobs:
             -scheme Lyrica \
             -destination "platform=iOS Simulator,id=$LYRICA_SIMULATOR_ID" \
             -resultBundlePath TestResults.xcresult \
+            -derivedDataPath build \
+            -parallel-testing-enabled NO \
             CODE_SIGNING_ALLOWED=NO
+      - name: Capture running search screen
+        run: |
+          xcrun simctl bootstatus "$LYRICA_SIMULATOR_ID" -b
+          xcrun simctl install "$LYRICA_SIMULATOR_ID" build/Build/Products/Debug-iphonesimulator/Lyrica.app
+          xcrun simctl launch "$LYRICA_SIMULATOR_ID" com.kerollosl.lyrica
+          sleep 3
+          xcrun simctl io "$LYRICA_SIMULATOR_ID" screenshot Lyrica-search.png
+      - name: Upload running screen
+        uses: actions/upload-artifact@v4
+        with:
+          name: lyrica-search-screen
+          path: Lyrica-search.png
+      - name: Print native failure diagnostics
+        if: failure()
+        run: |
+          if [ -d TestResults.xcresult ]; then
+            xcrun xcresulttool get test-results tests --path TestResults.xcresult --format json
+            xcrun xcresulttool export diagnostics --path TestResults.xcresult --output-path TestDiagnostics
+            python3 -c 'from pathlib import Path; [print(str(p) + "\n" + p.read_text()[:30000]) for p in Path("TestDiagnostics").rglob("*.ips")]'
+          fi
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4

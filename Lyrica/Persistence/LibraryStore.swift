@@ -8,9 +8,13 @@ import LyricaCore
 @MainActor
 final class LibraryStore {
     let context: ModelContext
+    // ModelContext alone does not guarantee the lifetime of an in-memory store.
+    // Keep its container alive for as long as this repository can access models.
+    private let container: ModelContainer
 
     init(context: ModelContext) {
         self.context = context
+        self.container = context.container
     }
 
     @discardableResult

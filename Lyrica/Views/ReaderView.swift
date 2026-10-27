@@ -39,7 +39,7 @@ struct ReaderView: View {
                         HStack {
                             Button("Try again") { Task { await model.load(store: store, settings: settings) } }
                             Spacer()
-                            Button("Paste lyrics") { showsManual = true }.buttonStyle(.borderedProminent)
+                            Button("Paste lyrics") { showsManual = true }.buttonStyle(.borderedProminent).foregroundStyle(LyricaStyle.paper)
                         }.padding(.top, 16)
                     }
                     if let document = model.document {

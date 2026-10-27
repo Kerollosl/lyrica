@@ -9,7 +9,16 @@ public protocol HTTPTransport: Sendable {
 
 public struct URLSessionTransport: HTTPTransport {
     private let session: URLSession
-    public init(session: URLSession = .shared) { self.session = session }
+    private static let serviceSession: URLSession = {
+        // Offline storage is an explicit app-level choice. Do not let HTTP's
+        // default disk cache retain lyrics independently of that setting.
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.urlCache = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return URLSession(configuration: configuration)
+    }()
+
+    public init(session: URLSession? = nil) { self.session = session ?? Self.serviceSession }
 
     public func data(for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         let (data, response) = try await session.data(for: request)
