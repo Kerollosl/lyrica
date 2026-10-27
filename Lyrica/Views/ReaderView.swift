@@ -1,6 +1,6 @@
 import SwiftUI
 import SwiftData
-import Translation
+@preconcurrency import Translation
 import LyricaCore
 
 struct ReaderView: View {
@@ -13,6 +13,7 @@ struct ReaderView: View {
     @State private var selectedLine: Int?
     @State private var showsManual = false
     @State private var showsOptions = false
+    @State private var manualAfterOptions = false
     @State private var showsPermission = false
     @State private var layout = ReaderLayout.automatic
     @State private var retry = 0
@@ -59,6 +60,9 @@ struct ReaderView: View {
                             if document.source == .lrclib {
                                 Link("About LRCLIB", destination: URL(string: "https://lrclib.net")!)
                             }
+                            if let url = model.song.appleMusicURL {
+                                Link("View in Apple Music", destination: url)
+                            }
                             Text("Machine translations may miss poetry, slang, or context.")
                         }
                         .font(.caption).foregroundStyle(.secondary).padding(.top, 32).padding(.bottom, 24)
@@ -95,7 +99,9 @@ struct ReaderView: View {
                 model.useManual(text, store: store, settings: settings)
             }
         }
-        .sheet(isPresented: $showsOptions) { options }
+        .sheet(isPresented: $showsOptions, onDismiss: {
+            if manualAfterOptions { manualAfterOptions = false; showsManual = true }
+        }) { options }
         .alert("Keep lyrics for offline reading?", isPresented: $showsPermission) {
             Button("Enable offline reading") { settings.cacheLyrics = true; model.persistCurrent(store: store) }
             Button("Save bookmark only", role: .cancel) { }
@@ -171,7 +177,7 @@ struct ReaderView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
             .environment(\.layoutDirection, rtl ? .rightToLeft : .leftToRight)
-            .accessibilitySpeechLanguage(language ?? Locale.current.identifier)
+            .environment(\.locale, Locale(identifier: language ?? Locale.current.identifier))
     }
 
     private var languageBar: some View {
@@ -208,7 +214,7 @@ struct ReaderView: View {
                     Text("If detection gets a short or multilingual song wrong, choose its main language.").font(.footnote).foregroundStyle(.secondary)
                 }
                 Section {
-                    Button("Paste or replace lyrics") { showsOptions = false; showsManual = true }
+                    Button("Paste or replace lyrics") { manualAfterOptions = true; showsOptions = false }
                 }
             }
             .navigationTitle("Reader options").navigationBarTitleDisplayMode(.inline)

@@ -1,6 +1,6 @@
 import Foundation
 import Observation
-import Translation
+@preconcurrency import Translation
 import NaturalLanguage
 
 struct ReaderLanguage: Identifiable, Hashable {

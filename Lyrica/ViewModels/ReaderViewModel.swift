@@ -1,6 +1,6 @@
 import Foundation
 import Observation
-import Translation
+@preconcurrency import Translation
 import LyricaCore
 
 struct TranslationRequest: Identifiable {
@@ -13,7 +13,10 @@ struct TranslationRequest: Identifiable {
 @MainActor @Observable
 final class ReaderViewModel {
     let song: Song
-    private(set) var document: LyricDocument?
+    private(set) var document: LyricDocument? = nil {
+        didSet { detectedLanguage = document.flatMap { LanguageCatalog.detect($0.text) } }
+    }
+    private(set) var detectedLanguage: String?
     private(set) var translated: [String] = []
     private(set) var isLoading = false
     private(set) var lyricsError: String?
@@ -26,6 +29,7 @@ final class ReaderViewModel {
     var storageError: String?
     private let provider: any LyricsProviding
     private var generation = UUID()
+    private var loadGeneration = UUID()
     private var memoryTranslations: [String: [String]] = [:]
 
     init(song: Song, provider: any LyricsProviding = LRCLIBClient()) {
@@ -34,25 +38,35 @@ final class ReaderViewModel {
     }
 
     var sourceLanguage: String? {
-        sourceOverride == "auto" ? document.flatMap { LanguageCatalog.detect($0.text) } : sourceOverride
+        sourceOverride == "auto" ? detectedLanguage : sourceOverride
     }
 
     func load(store: LibraryStore, settings: AppSettings) async {
         guard document == nil, !isLoading else { return }
+        let loadToken = UUID()
+        loadGeneration = loadToken
         isLoading = true
         lyricsError = nil
         targetLanguage = settings.defaultLanguage
-        defer { isLoading = false }
+        defer { if loadGeneration == loadToken { isLoading = false } }
         do {
             if let stored = try store.storedSong(id: song.id) {
                 isFavorite = stored.isFavorite
                 document = stored.document
             }
-            if document == nil { document = try await provider.lyrics(for: song) }
+            // Keep a metadata bookmark even when this recording has no available lyrics.
+            try store.upsert(song: song)
+            if document == nil {
+                let fetched = try await provider.lyrics(for: song)
+                try Task.checkCancellation()
+                guard loadGeneration == loadToken else { return }
+                document = fetched
+            }
             try Task.checkCancellation()
             try store.upsert(song: song, document: settings.cacheLyrics ? document : nil)
         } catch is CancellationError { }
         catch {
+            guard loadGeneration == loadToken else { return }
             if document == nil { lyricsError = error.localizedDescription }
             else { storageError = error.localizedDescription }
         }
@@ -60,6 +74,8 @@ final class ReaderViewModel {
 
     func useManual(_ text: String, store: LibraryStore, settings: AppSettings) {
         generation = UUID()
+        loadGeneration = UUID()
+        isLoading = false
         request = nil
         let replacement = LyricDocument(text: text, source: .manual)
         guard !replacement.lines.isEmpty else { return }
