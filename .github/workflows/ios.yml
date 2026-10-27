@@ -1,0 +1,74 @@
+name: iOS build and tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect Xcode
+        run: xcodebuild -version
+      - name: Test portable core
+        run: swift test
+      - name: Build physical-device code paths without signing
+        run: |
+          xcodebuild build \
+            -project Lyrica.xcodeproj \
+            -scheme Lyrica \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO
+      - name: Choose an available iPhone simulator
+        run: |
+          DEVICE_ID=$(xcrun simctl list devices available --json | python3 -c 'import json,sys; d=json.load(sys.stdin); ids=[v["udid"] for runtime, values in d["devices"].items() if "iOS" in runtime for v in values if v.get("isAvailable") and "iPhone" in v["name"]]; print(ids[0] if ids else "")')
+          test -n "$DEVICE_ID"
+          echo "LYRICA_SIMULATOR_ID=$DEVICE_ID" >> "$GITHUB_ENV"
+      - name: Build app and run persistence tests
+        run: |
+          xcodebuild test \
+            -project Lyrica.xcodeproj \
+            -scheme Lyrica \
+            -destination "platform=iOS Simulator,id=$LYRICA_SIMULATOR_ID" \
+            -resultBundlePath TestResults.xcresult \
+            -derivedDataPath build \
+            -parallel-testing-enabled NO \
+            CODE_SIGNING_ALLOWED=NO
+      - name: Capture running search screen
+        run: |
+          xcrun simctl bootstatus "$LYRICA_SIMULATOR_ID" -b
+          xcrun simctl install "$LYRICA_SIMULATOR_ID" build/Build/Products/Debug-iphonesimulator/Lyrica.app
+          xcrun simctl launch "$LYRICA_SIMULATOR_ID" com.kerollosl.lyrica
+          sleep 3
+          xcrun simctl io "$LYRICA_SIMULATOR_ID" screenshot Lyrica-search.png
+      - name: Upload running screen
+        uses: actions/upload-artifact@v4
+        with:
+          name: lyrica-search-screen
+          path: Lyrica-search.png
+      - name: Print native failure diagnostics
+        if: failure()
+        run: |
+          if [ -d TestResults.xcresult ]; then
+            xcrun xcresulttool get test-results tests --path TestResults.xcresult --format json
+            xcrun xcresulttool export diagnostics --path TestResults.xcresult --output-path TestDiagnostics
+            python3 -c 'from pathlib import Path; [print(str(p) + "\n" + p.read_text()[:30000]) for p in Path("TestDiagnostics").rglob("*.ips")]'
+          fi
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-test-results
+          path: TestResults.xcresult
+          if-no-files-found: ignore
