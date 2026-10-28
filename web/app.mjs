@@ -1,3 +1,4 @@
+import { icon } from "./icons.mjs";
 import {
   languages,
   rtl,
@@ -16,6 +17,9 @@ import {
 } from "./translation.mjs";
 const main = document.querySelector("main");
 const dialog = document.querySelector("dialog");
+document
+  .querySelectorAll("[data-icon]")
+  .forEach((el) => (el.innerHTML = icon(el.dataset.icon)));
 const state = {
   page: "search",
   query: "",
@@ -78,13 +82,20 @@ async function refreshSongs() {
 function cover(song, className = "") {
   return song.artworkURL?.startsWith("https://")
     ? `<img class="cover ${className}" src="${e(song.artworkURL)}" alt="" loading="lazy">`
-    : `<div class="cover demo-cover ${className}" aria-hidden="true"></div>`;
+    : `<div class="cover ${song.demo ? "demo-cover" : "placeholder-cover"} ${className}" aria-hidden="true">${song.demo ? "" : icon("note")}</div>`;
 }
 function songRow(song, index, action = "open-result", offline = false) {
   const minutes = `${Math.floor(song.duration / 60)}:${String(Math.floor(song.duration % 60)).padStart(2, "0")}`;
-  return `<button class="song-row" data-action="${action}" data-index="${index}">${cover(song)}<span class="song-info"><strong>${e(song.title)}</strong><span>${e(song.artist)}</span><small>${e(song.album)}</small></span><span class="song-duration">${offline ? "↓ Saved" : song.duration ? minutes : "Demo"}</span><span aria-hidden="true">↗</span></button>`;
+  return `<button class="song-row" data-action="${action}" data-index="${index}">${cover(song)}<span class="song-info"><strong>${e(song.title)}</strong><span>${e(song.artist)}</span><small>${e(song.album)}</small></span><span class="song-duration">${offline ? `${icon("download")} Saved` : song.duration ? minutes : "Demo"}</span>${icon("chevron")}</button>`;
 }
 function render() {
+  const focused = main.contains(document.activeElement)
+    ? document.activeElement.id
+    : null;
+  const focusedAction = main.contains(document.activeElement)
+    ? document.activeElement.dataset.action
+    : null;
+  const optionsOpen = Boolean(document.querySelector(".reader-options")?.open);
   document.querySelectorAll("[data-nav]").forEach((link) => {
     const active =
       link.dataset.nav ===
@@ -101,17 +112,35 @@ function render() {
         : state.page === "settings"
           ? settingsView()
           : searchView();
+  if (optionsOpen && state.page === "reader") {
+    const menu = document.querySelector(".reader-options");
+    if (menu) menu.open = true;
+  }
+  if (focused) document.getElementById(focused)?.focus({ preventScroll: true });
+  else if (focusedAction)
+    main
+      .querySelector(`[data-action="${focusedAction}"]`)
+      ?.focus({ preventScroll: true });
 }
 function searchView() {
-  return `${!state.query ? `<section class="welcome"><div><span class="eyebrow">LYRICS, WITHOUT BORDERS</span><h1>Find the words.<br><em>Feel the meaning.</em></h1><p class="intro">The songs you love have more to say.<br>Discover their words, in your language.</p></div><div class="demo-art"><small>A LITTLE WINDOW INTO LYRICA</small><div class="sun"></div><blockquote>“Si las palabras<br>son un puente…”</blockquote><button data-action="demo">Open the bilingual demo &nbsp; ↗</button></div></section>` : ""}<section class="search-area"><form id="search-form" role="search"><div class="search-box"><span class="search-icon" aria-hidden="true">⌕</span><input type="search" id="song-search" aria-label="Search songs or paste an Apple Music link" placeholder="Song, artist, album, or Apple Music link" value="${e(state.query)}" autocomplete="off" spellcheck="false"><button class="search-submit" type="submit" aria-label="Search">Search <span aria-hidden="true">↗</span></button></div></form><div class="search-help"><span>Apple Music links welcome. No playback required.</span><span>Free, from the very first word.</span></div>${!state.query && state.recent.length ? `<div class="recent"><span>Recent</span>${state.recent.map((query, index) => `<button class="chip" data-action="recent" data-index="${index}">${e(query)}</button>`).join("")}<button class="plain" data-action="clear-recent">Clear</button></div>` : ""}<div id="search-results" aria-live="polite">${searchResults()}</div></section>${!state.query ? `<section class="steps"><div><span>01</span>Find your song<p>Search the music you love, or bring an Apple Music link.</p></div><div><span>02</span>Choose a language<p>Translate on your device in supported browsers.</p></div><div><span>03</span>Read between the lines<p>Keep the original and its meaning together.</p></div></section>` : ""}`;
+  const recentSongs = state.songs.slice(0, 6);
+  return `<header class="discover-heading"><span class="pill">${icon("languages")} A world of words</span><h1>Understand every line.</h1><p>Your favorite songs. A whole new meaning.</p></header>
+  <section class="search-panel" aria-label="Find a song"><form id="search-form" role="search"><div class="search-box">${icon("search")}<input type="search" id="song-search" aria-label="Search songs or paste an Apple Music link" placeholder="Search songs, artists, or albums" value="${e(state.query)}" autocomplete="off" spellcheck="false"><button class="search-submit" type="submit" aria-label="Search">Search ${icon("arrow")}</button></div></form><div class="search-help"><span>${icon("link")} Or paste an Apple Music song link</span><span>Press <kbd>/</kbd> to search</span></div>
+  ${state.recent.length ? `<div class="recent"><span>Recent</span>${state.recent.map((query, index) => `<button class="chip" data-action="recent" data-index="${index}">${icon("clock")}${e(query)}</button>`).join("")}<button class="plain" data-action="clear-recent">Clear</button></div>` : ""}<div id="search-results" aria-live="polite">${searchResults()}</div></section>
+  ${
+    !state.query
+      ? `<section class="demo-feature" aria-labelledby="demo-title"><div class="demo-art" aria-hidden="true"><div class="sun"></div><span class="art-wordmark">entre<br>las palabras.</span><span class="art-caption">LYRICA STUDIO — VOL. 01</span></div><div class="demo-copy"><span class="eyebrow">Your first look</span><h2 id="demo-title">A song. Two perspectives.</h2><p>Read an original Spanish verse alongside its meaning. Switch languages, highlight a line, and find your favorite way to read.</p><button class="primary demo-action" data-action="demo">Open the bilingual demo ${icon("arrow")}</button><small>Original demo · Includes example translations</small></div></section>
+  ${recentSongs.length ? `<section class="recently-read"><div class="section-heading"><h2>Pick up where you left off</h2><a href="#library">Your library ${icon("arrow")}</a></div><div class="recent-cards">${recentSongs.map((record) => `<button class="collection-card" data-action="open-library" data-index="${e(record.id)}">${cover(record.song)}<strong>${e(record.song.title)}</strong><span>${e(record.song.artist)}</span>${record.document ? `<small>${icon("download")} Available offline</small>` : ""}</button>`).join("")}</div></section>` : `<div class="discovery-note">${icon("lock")} No account. No subscription. Just you and the words.</div>`}`
+      : ""
+  }`;
 }
 function searchResults() {
   if (state.busy)
-    return '<div class="notice"><span class="spinner"></span>Finding your song…</div>';
+    return `<div class="search-skeleton" role="status" aria-label="Finding your song">${Array.from({ length: 4 }, () => '<div class="skeleton-row"><span class="skeleton skeleton-cover"></span><span class="skeleton-copy"><span class="skeleton skeleton-title"></span><span class="skeleton skeleton-subtitle"></span></span></div>').join("")}</div>`;
   if (state.error)
     return `<div class="notice">${e(state.error)} <button class="plain" data-action="retry-search">Try again</button></div>`;
   if (!state.searched) return "";
-  return `<div class="section-heading"><h2>Choose your recording</h2><span>${state.results.length} results</span></div>${state.results.length ? state.results.map((song, i) => songRow(song, i)).join("") : '<div class="empty">No songs found. Try a different title or artist.</div>'}<p class="search-help">Check the album and duration for remixes, live versions, and re-recordings.</p>`;
+  return `<div class="section-heading"><h2>Choose your recording</h2><span>${state.results.length} results</span></div>${state.results.length ? state.results.map((song, i) => songRow(song, i)).join("") : `<div class="empty-state">${icon("search")}<h2>No songs found</h2><p>Try another title, artist, or Apple Music song link.</p></div>`}<p class="search-help">Check the album and duration for remixes, live versions, and re-recordings.</p>`;
 }
 function libraryView() {
   const records = state.songs.filter(
@@ -122,33 +151,45 @@ function libraryView() {
           .toLowerCase()
           .includes(state.libraryQuery.toLowerCase())),
   );
-  return `<div class="page-head"><span class="eyebrow">YOUR PERSONAL COLLECTION</span><h1 class="page-title">Words worth keeping.</h1><p>Your favorites and recently viewed songs, all in one quiet place.</p></div><div class="library-tools"><div class="segmented"><button data-action="history" class="${!state.favorites ? "selected" : ""}">Recently viewed</button><button data-action="favorites" class="${state.favorites ? "selected" : ""}">Favorites</button></div><input class="library-search" id="library-search" aria-label="Search your library" placeholder="Search your library" value="${e(state.libraryQuery)}"></div><div id="library-records">${records.length ? records.map((record) => `<div class="library-item">${songRow(record.song, record.id, "open-library", Boolean(record.document))}<button class="icon-button danger" data-action="remove" data-id="${e(record.id)}" aria-label="Remove ${e(record.song.title)}">×</button></div>`).join("") : '<div class="empty">Your collection starts with a song. Discover one, or try the original bilingual demo.<br><button class="plain" data-action="demo">Open demo ↗</button></div>'}</div><p class="search-help">↓ Saved means original lyrics are available offline. Translated languages are saved only when permitted caching is enabled.</p>`;
+  return `<header class="page-head"><span class="eyebrow">Collected by you</span><h1 class="page-title">Your library</h1><p>The words you come back to.</p></header><div class="library-tools"><div class="segmented" aria-label="Library filter"><button data-action="history" aria-pressed="${!state.favorites}" class="${!state.favorites ? "selected" : ""}">${icon("clock")} Recently viewed</button><button data-action="favorites" aria-pressed="${state.favorites}" class="${state.favorites ? "selected" : ""}">${icon("heart")} Favorites</button></div><div class="library-search-wrap">${icon("search")}<input type="search" class="library-search" id="library-search" aria-label="Search your library" placeholder="Find a saved song" value="${e(state.libraryQuery)}"></div></div><div id="library-records" class="${state.favorites ? "favorite-grid" : "library-list"}">${records.length ? records.map((record) => `<article class="library-item">${songRow(record.song, record.id, "open-library", Boolean(record.document))}<button class="icon-button remove-song" data-action="remove" data-id="${e(record.id)}" aria-label="Remove ${e(record.song.title)}">${icon("close")}</button></article>`).join("") : `<div class="empty-state">${icon(state.favorites ? "heart" : "library")}<h2>${state.libraryQuery ? "No matching songs" : state.favorites ? "Keep a little meaning" : "Your collection starts here"}</h2><p>${state.libraryQuery ? "Try another title, artist, or album." : "Open a song and tap the heart to keep it close."}</p><button class="primary" data-action="demo">Open demo ${icon("arrow")}</button></div>`}</div><p class="storage-note">${icon("download")} Saved lyrics and previously translated languages are available offline. Bookmarks keep just the song details.</p>`;
 }
 function readerView() {
   const reader = state.reader;
   if (!reader) return "";
   const source = state.source || reader.document?.language || "";
-  return `<div class="reader-top"><button class="plain" data-action="back">← Back to ${readerOrigin === "library" ? "library" : "discover"}</button><div class="reader-actions"><button class="icon-button" data-action="smaller" aria-label="Smaller lyrics">A−</button><button class="icon-button" data-action="larger" aria-label="Larger lyrics">A+</button><button class="icon-button" data-action="layout" aria-label="Switch between columns and stacked layout" aria-pressed="${state.stacked}">☷</button><button class="icon-button" data-action="favorite" aria-label="${reader.favorite ? "Remove from favorites" : "Save favorite"}" aria-pressed="${Boolean(reader.favorite)}">${reader.favorite ? "♥" : "♡"}</button></div></div><header class="reader-song">${cover(reader.song)}<div><h1>${e(reader.song.title)}</h1><p>${e(reader.song.artist)}<br>${e(reader.song.album)}</p></div></header><div class="language-bar"><div class="language-control"><label for="source-language">Original language</label><select id="source-language"><option value="" ${!source ? "selected" : ""}>Detect / choose language</option>${options(source)}</select></div><span aria-hidden="true">→</span><div class="language-control"><label for="target-language">Translate into</label><select id="target-language">${options(state.target)}</select></div><span class="on-device">ON YOUR DEVICE</span></div><div id="translation-status" role="status">${translationNotice()}</div>${
+  return `<div class="reader-top"><button class="back-button" data-action="back">${icon("back")} ${readerOrigin === "library" ? "Your library" : "Discover"}</button><div class="reader-actions"><button class="favorite-button ${reader.favorite ? "is-saved" : ""}" data-action="favorite" aria-label="${reader.favorite ? "Remove from favorites" : "Save favorite"}" aria-pressed="${Boolean(reader.favorite)}">${icon("heart", reader.favorite)}<span>${reader.favorite ? "Saved" : "Save song"}</span></button><details class="reader-options"><summary aria-label="Reader options">${icon("settings")}<span>Reader options</span></summary><div class="options-menu"><span class="menu-label">Text size</span><div class="font-controls"><button class="icon-button" data-action="smaller" aria-label="Smaller lyrics">A−</button><span>${state.settings.font}px</span><button class="icon-button" data-action="larger" aria-label="Larger lyrics">A+</button></div><button data-action="layout" aria-label="Switch between columns and stacked layout" aria-pressed="${state.stacked}">${icon("layout")} ${state.stacked ? "Use columns" : "Stack translations"}</button><button data-action="manual-original">${icon("note")} Paste or replace lyrics</button><button data-action="manual-translation" ${!reader.document ? "disabled" : ""}>${icon("languages")} Paste a translation</button></div></details></div></div>
+  <header class="reader-song">${cover(reader.song)}<div><span class="eyebrow">${reader.song.demo ? "Original demo" : "Your lyrics, translated"}</span><h1>${e(reader.song.title)}</h1><p><strong>${e(reader.song.artist)}</strong><span aria-hidden="true"> · </span>${e(reader.song.album)}</p></div></header>
+  <div class="language-bar"><div class="language-control"><label for="source-language">Original</label><select id="source-language"><option value="" ${!source ? "selected" : ""}>Detect / choose language</option>${options(source)}</select></div><span class="language-arrow">${icon("arrow")}</span><div class="language-control"><label for="target-language">Translation</label><select id="target-language">${options(state.target)}</select></div><span class="on-device">${icon(reader.song.demo ? "languages" : "lock")}${reader.song.demo ? "Example translations" : "On-device translation"}</span></div><div id="translation-status" role="status">${translationNotice()}</div>
+  ${
     reader.document
-      ? `<section class="${state.stacked ? "stacked" : ""}" aria-label="Bilingual lyrics"><div class="lyric-columns"><span>Original · ${e(languages[source] || "Auto")}</span><span>${e(languages[state.target] || state.target)}</span></div><div id="lyric-lines">${reader.document.text
+      ? `<section class="bilingual-panel ${state.stacked ? "stacked" : ""}" aria-label="Bilingual lyrics"><div class="lyric-columns"><span>Original <small>${e(languages[source] || "Auto")}</small></span><span>Translation <small>${e(languages[state.target] || state.target)}</small></span></div><div id="lyric-lines">${reader.document.text
           .split("\n")
           .map((line, index) =>
             line
               ? `<button class="lyric-row" data-action="highlight" data-index="${index}" aria-pressed="${state.selected === index}"><span lang="${e(source || "und")}" dir="${rtl(source) ? "rtl" : "auto"}">${e(line)}</span><span class="translated" lang="${e(state.target)}" dir="${rtl(state.target) ? "rtl" : "auto"}">${e(state.lines[index] || "—")}</span></button>`
               : '<div class="verse-space" aria-hidden="true"></div>',
           )
-          .join("")}</div></section>`
-      : ""
-  }<div class="lyric-foot">${reader.song.demo ? "Original demo lyrics and example translations by Lyrica Studio. This is fictional demo material, not a commercial recording." : reader.document?.source === "lrclib" ? 'Lyrics provided by <a href="https://lrclib.net" target="_blank" rel="noopener">LRCLIB</a>. Rights belong to their respective owners.' : "Lyrics supplied by you. Only use material you’re permitted to read and retain."}<br>Machine translations may miss poetry, idioms, or context. ${reader.song.appleMusicURL?.startsWith("https://") ? `<a href="${e(reader.song.appleMusicURL)}" target="_blank" rel="noopener">View in Apple Music ↗</a>` : ""}<br><button class="plain" data-action="manual-original">Paste or replace original lyrics</button> &nbsp; <button class="plain" data-action="manual-translation" ${!reader.document ? "disabled" : ""}>Paste a translation</button></div>`;
+          .join(
+            "",
+          )}</div><div class="reader-tip">${icon("check")} Tap any line to keep your place.</div></section>`
+      : reader.loading
+        ? `<div class="reader-skeleton" aria-hidden="true">${Array.from({ length: 5 }, () => '<div class="skeleton-row"><span class="skeleton skeleton-title"></span><span class="skeleton skeleton-title"></span></div>').join("")}</div>`
+        : ""
+  }
+  <footer class="lyric-foot"><p>${reader.song.demo ? "Original demo lyrics and example translations by Lyrica Studio. Fictional material, not a commercial recording." : reader.document?.source === "lrclib" ? 'Lyrics from <a href="https://lrclib.net" target="_blank" rel="noopener">LRCLIB</a>. Rights belong to their respective owners.' : "Lyrics supplied by you. Only use material you’re permitted to read and retain."}</p><p>Translations may miss poetry, idioms, or context. ${reader.song.appleMusicURL?.startsWith("https://") ? `<a href="${e(reader.song.appleMusicURL)}" target="_blank" rel="noopener">View in Apple Music ${icon("external")}</a>` : ""}</p></footer>`;
 }
 function translationNotice() {
   if (state.reader?.loading)
     return '<div class="notice"><span class="spinner"></span>Finding the words…</div>';
   if (!state.message) return "";
-  return `<div class="notice">${state.translating ? '<span class="spinner"></span>' : ""}${e(state.message)}${!state.translating && state.reader?.document && !state.lines.length ? '<button class="plain" data-action="translate">Translate on this device</button><button class="plain" data-action="manual-translation">Paste translation</button>' : ""}${!state.reader?.document ? '<button class="plain" data-action="retry-lyrics">Retry</button><button class="plain" data-action="manual-original">Paste lyrics</button>' : ""}</div>`;
+  return `<div class="notice status-inline">${state.translating ? '<span class="spinner"></span>' : ""}${e(state.message)}${!state.translating && state.reader?.document && !state.lines.length ? '<button class="plain" data-action="translate">Translate on this device</button><button class="plain" data-action="manual-translation">Paste translation</button>' : ""}${!state.reader?.document ? '<button class="plain" data-action="retry-lyrics">Retry</button><button class="plain" data-action="manual-original">Paste lyrics</button>' : ""}</div>`;
 }
 function settingsView() {
-  return `<div class="page-head"><span class="eyebrow">A READER THAT FEELS LIKE YOU</span><h1 class="page-title">Make yourself at home.</h1><p>A few thoughtful choices. Everything else gets out of the way.</p></div><div class="settings-grid"><section class="setting-section"><h2>Reading</h2><div class="setting-row"><label for="default-language">Default translation language</label><select id="default-language">${options(state.settings.target)}</select></div><div class="setting-row"><label for="theme">Appearance</label><select id="theme">${["system", "light", "dark"].map((value) => `<option value="${value}" ${value === state.settings.theme ? "selected" : ""}>${value[0].toUpperCase() + value.slice(1)}</option>`).join("")}</select></div><div class="setting-row"><label for="font-size">Lyrics text size <small id="font-value">${state.settings.font}px</small></label><input id="font-size" type="range" min="15" max="30" value="${state.settings.font}"></div></section><section class="setting-section"><h2>On this browser</h2><div class="setting-row"><label for="cache">Save permitted lyrics offline<p>Lyrics and translations stay in this browser. Enable only for material you’re permitted to keep.</p></label><input id="cache" type="checkbox" ${state.settings.cache ? "checked" : ""}></div><p>${state.songs.filter((song) => song.document).length} originals saved · ${state.songs.filter((song) => song.favorite).length} favorites. Browser data is separate from your iPhone library.</p><div class="storage-buttons"><button class="plain" data-action="clear-cache">Clear lyrics & translations</button><button class="plain" data-action="clear-recent">Clear recent searches</button><button class="plain danger" data-action="delete-all">Delete library & history</button></div></section><section class="setting-section"><h2>Free. And honest about the details.</h2><p>Search and metadata come from Apple’s iTunes API. Lyrics come from LRCLIB. Availability does not grant copyright or redistribution rights. Only paste or store material you’re authorized to use.</p><p>Automatic web translation uses the browser’s on-device Translator API where available (supported desktop Chrome versions, compatible hardware and language pairs). It may need a free model download and a manual source-language selection. Safari, Firefox, and many mobile browsers don’t provide this API; paste translations or explore the original bilingual demo there. Apple Translation is exclusive to the native iPhone app.</p><p>Queries go directly to Apple, and recording metadata goes directly to LRCLIB. Lyrica has no analytics, accounts, server, paid API, or cloud sync. Only the application shell is cached automatically; lyric storage is opt-in. Clearing browser data removes your library. Browser-managed translation models are managed by the browser.</p><a class="plain" href="https://github.com/Kerollosl/lyrica" target="_blank" rel="noopener">Explore the iPhone app and source ↗</a></section></div>`;
+  return `<header class="page-head"><span class="eyebrow">Your reading space</span><h1 class="page-title">Settings</h1><p>Make Lyrica feel like you.</p></header><div class="settings-grid">
+  <section class="setting-section"><h2>${icon("text")} Reading</h2><div class="setting-row"><label for="default-language">Default translation language</label><select id="default-language">${options(state.settings.target)}</select></div><div class="setting-row"><label for="font-size">Lyrics text size <small id="font-value">${state.settings.font}px</small></label><input id="font-size" type="range" min="15" max="30" value="${state.settings.font}"></div></section>
+  <section class="setting-section"><h2>${icon("settings")} Appearance</h2><div class="setting-row"><label for="theme">Color theme<small>Follow your device, or choose your own.</small></label><select id="theme">${["system", "light", "dark"].map((value) => `<option value="${value}" ${value === state.settings.theme ? "selected" : ""}>${value[0].toUpperCase() + value.slice(1)}</option>`).join("")}</select></div></section>
+  <section class="setting-section"><h2>${icon("download")} Storage</h2><div class="setting-row"><label for="cache">Save permitted lyrics offline<small>Only save lyrics and translations you’re permitted to keep.</small></label><input id="cache" type="checkbox" ${state.settings.cache ? "checked" : ""}></div><p>${state.songs.filter((song) => song.document).length} originals saved · ${state.songs.filter((song) => song.favorite).length} favorites. Stored on this browser, separate from your iPhone library.</p><div class="storage-buttons"><button class="plain" data-action="clear-cache">Clear lyrics & translations</button><button class="plain" data-action="clear-recent">Clear recent searches</button><button class="plain danger" data-action="delete-all">Delete library & history</button></div></section>
+  <details class="setting-section about-details"><summary>About Lyrica & privacy</summary><div class="about-content"><p>Search and metadata come from Apple’s iTunes API. Lyrics come from LRCLIB. Availability does not grant copyright or redistribution rights. Only paste or store material you’re authorized to use.</p><p>Automatic web translation uses the browser’s on-device Translator API where available (supported desktop Chrome versions, compatible hardware and language pairs). It may need a free model download and a manual source-language selection. Safari, Firefox, and many mobile browsers don’t provide this API; paste translations or explore the original bilingual demo there. Apple Translation is exclusive to the native iPhone app.</p><p>Queries go directly to Apple, and recording metadata goes directly to LRCLIB. Lyrica has no analytics, accounts, server, paid API, or cloud sync. Only the application shell is cached automatically; lyric storage is opt-in. Clearing browser data removes your library. Browser-managed translation models are managed by the browser.</p><a class="plain" href="https://github.com/Kerollosl/lyrica" target="_blank" rel="noopener">Explore the iPhone app and source ${icon("external")}</a></div></details></div>`;
 }
 async function search() {
   searchController?.abort();
@@ -529,6 +570,7 @@ document.addEventListener("click", async (event) => {
         Math.min(30, state.settings.font + (action === "larger" ? 1 : -1)),
       );
       await saveSettings();
+      render();
     }
     if (action === "favorite") {
       state.reader.favorite = !state.reader.favorite;
@@ -654,3 +696,34 @@ if ("serviceWorker" in navigator)
   navigator.serviceWorker.register("./sw.js").catch(() => {
     /* Reader still works when installation is unavailable. */
   });
+
+// A familiar keyboard shortcut without intercepting typing or dialog input.
+document.addEventListener("keydown", (event) => {
+  if (
+    event.key === "/" &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !dialog.open &&
+    !["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName)
+  ) {
+    const input = document.querySelector("#song-search");
+    if (input) {
+      event.preventDefault();
+      input.focus();
+    }
+  }
+  if (event.key === "Escape") {
+    const menu = document.querySelector(".reader-options");
+    if (menu?.open) {
+      const focusInside = menu.contains(document.activeElement);
+      menu.open = false;
+      if (focusInside)
+        menu.querySelector("summary").focus({ preventScroll: true });
+    }
+  }
+});
+
+document.addEventListener("click", (event) => {
+  const menu = document.querySelector(".reader-options");
+  if (menu && !menu.contains(event.target)) menu.open = false;
+});

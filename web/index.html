@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta name="theme-color" content="#f6f4ed" />
+    <meta name="theme-color" content="#f7f7f4" />
     <meta
       name="description"
       content="Find a song. Discover its meaning. Lyrica is a free bilingual lyrics reader with private, on-device translation in supported browsers."
@@ -11,42 +11,61 @@
     <title>Lyrica — Words, a little closer.</title>
     <link rel="icon" href="icon.png" />
     <link rel="manifest" href="manifest.webmanifest" />
+    <link
+      rel="preload"
+      href="fonts/manrope-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
     <link rel="stylesheet" href="style.css" />
     <script type="module" src="app.mjs"></script>
   </head>
   <body>
     <a class="skip" href="#main">Skip to content</a>
     <div class="shell">
-      <aside class="sidebar">
-        <a class="brand" href="#search"
-          >lyrica<span class="brand-mark">＝</span></a
-        ><span class="eyebrow brand-caption">WORDS, A LITTLE CLOSER.</span>
-        <nav aria-label="Main navigation">
-          <a href="#search" data-nav="search"><span>⌕</span> Discover</a
-          ><a href="#library" data-nav="library"
-            ><span>♡</span> Your library <small id="library-count">0</small></a
-          ><a href="#settings" data-nav="settings"><span>☷</span> Settings</a>
-        </nav>
-        <div class="sidebar-foot">
-          <span class="privacy-dot"></span> A space for understanding.
-          <p>No account. No subscription.<br />Just you and the words.</p>
+      <header class="app-header">
+        <div class="header-inner">
+          <a class="brand" href="#search" aria-label="Lyrica home"
+            ><span class="brand-symbol" aria-hidden="true"
+              ><svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+              >
+                <path
+                  d="M5 5h5M5 10h5M5 15h3m6-10h5m-5 5h5m-5 5h3"
+                /></svg></span
+            >lyrica</a
+          >
+          <nav aria-label="Main navigation">
+            <a href="#search" data-nav="search"
+              ><span data-icon="search"></span><span>Discover</span></a
+            >
+            <a href="#library" data-nav="library"
+              ><span data-icon="library"></span><span>Your library</span
+              ><small id="library-count">0</small></a
+            >
+            <a href="#settings" data-nav="settings"
+              ><span data-icon="settings"></span><span>Settings</span></a
+            >
+          </nav>
           <a
+            class="iphone-link"
             href="https://github.com/Kerollosl/lyrica"
             target="_blank"
             rel="noopener"
-            >Also made for iPhone ↗</a
-          >
+            >Made for iPhone, too <span data-icon="external"></span
+          ></a>
         </div>
-      </aside>
+      </header>
       <div class="workspace">
-        <header class="topbar">
-          <span class="eyebrow">THE BILINGUAL LYRICS READER</span
-          ><span class="quiet-label">○ &nbsp; Private by design</span>
-        </header>
         <main id="main" tabindex="-1"></main>
         <footer class="page-footer">
-          <span>Listen with your eyes. Understand with your heart.</span
-          ><span>Lyrica / Web edition</span>
+          <span>Lyrica. A little closer to the words.</span
+          ><span>Free. Private. Yours.</span>
         </footer>
       </div>
     </div>

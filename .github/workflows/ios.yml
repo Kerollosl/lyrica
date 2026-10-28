@@ -3,6 +3,7 @@ name: iOS build and tests
 on:
   push:
     branches: [main]
+    paths: ['Lyrica/**', 'LyricaTests/**', 'Lyrica.xcodeproj/**', 'Sources/**', 'Tests/**', 'Package.swift', '.github/workflows/ios.yml']
   pull_request:
   workflow_dispatch:
 

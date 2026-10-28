@@ -1,10 +1,10 @@
 {
-  "name": "Lyrica — Bilingual Lyrics Reader",
+  "name": "Lyrica \u2014 Bilingual Lyrics Reader",
   "short_name": "Lyrica",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#f6f4ed",
-  "theme_color": "#f6f4ed",
+  "background_color": "#f7f7f4",
+  "theme_color": "#f7f7f4",
   "icons": [
     {
       "src": "icon.png",
