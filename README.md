@@ -6,6 +6,10 @@ Lyrica is a native iPhone lyrics reader that brings the original words and an on
 
 Built with **SwiftUI · Swift · iOS 18+ · SwiftData · Apple Translation**.
 
+## Video walkthrough
+
+[Watch the 56-second MP4 walkthrough](docs/lyrica-walkthrough.mp4). Recorded from the running web app, with captions and original fictional demo lyrics. Included translations demonstrate the interface; this video does not demonstrate a browser model download.
+
 ## Web version
 
 The browser companion is included in [`web/`](web/README.md), committed directly to `main` alongside the iOS app. Run it without installing dependencies:
