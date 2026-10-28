@@ -32,4 +32,4 @@ Run on an iPhone with iOS 18 or later. This is a manual release checklist, not a
 
 ## Release evidence
 
-Record the device/OS, tested language pairs, build commit, Xcode version, `swift test` result, `xcodebuild test` result, and remaining known limitations in the release or pull request. Capture real screenshots after runtime verification to supplement the illustrated design previews.
+Record the device/OS, tested language pairs, build commit, Xcode version, `swift test` result, `xcodebuild test` result, and remaining known limitations in the release or pull request. The current screenshot matrix and native CI captures document runtime appearance; the older illustrated studies are historical. Verify that pinned original/translation controls remain usable while scrolling, that favorite grid removal is discoverable with VoiceOver, and that permission/download sheets work on a physical iPhone. Record results in release notes.

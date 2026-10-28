@@ -13,7 +13,7 @@ Lyrica is a focused music-reading app. Artwork identifies the song; language con
 | Accent | `#C45238` | `#F2A58C` |
 | Subtle selected surface (web) | `#FCEBE5` | `#3E2B25` |
 
-Web tokens live in `web/style.css`; native semantic colors live in the asset catalog and are exposed through `LyricaStyle`. Native selected rows use a subtle accent tint over the canvas. Accent buttons use explicit contrasting foreground colors: white in light mode, dark ink in dark mode. Measured web ratios: white on coral 4.55:1, secondary text on the light canvas 5.10:1, and secondary text on the dark surface 6.83:1.
+The table lists web tokens in `web/style.css`. Native semantic colors live in the asset catalog and are exposed through `LyricaStyle`; the dark native text colors are slightly brighter (`#F3F4F0` primary and `#B1B8AF` secondary), while canvas, surfaces, and accent are shared. Native selected rows use a subtle accent tint over the canvas. Accent buttons use explicit contrasting foreground colors: white in light mode, dark ink in dark mode. Measured web ratios: white on coral 4.55:1, secondary text on the light canvas 5.10:1, and secondary text on the dark surface 6.83:1.
 
 Web uses locally hosted variable Manrope (400–800), with its SIL Open Font License in `web/fonts/OFL.txt`. Other scripts fall back to platform fonts. iOS uses SF typography and Dynamic Type. The italic Lyrica wordmark is the only prominent serif treatment. Display text is concise and balanced; utility text uses sentence case.
 

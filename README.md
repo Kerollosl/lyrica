@@ -36,6 +36,10 @@ The web and iOS apps now share a refined visual system: soft surfaces, clear san
 
 The older illustrated concepts in `docs/previews/` are historical design studies. The screenshots above are captured from the current running app; original demo lyrics are labeled, and no screenshot demonstrates a model download.
 
+These iPhone Search screens are captured from the running iOS simulator in light and dark appearance:
+
+<p><img src="docs/ios/search-light.png" width="26%" alt="Lyrica iPhone Search in light mode" /> <img src="docs/ios/search-dark.png" width="26%" alt="Lyrica iPhone Search in dark mode" /></p>
+
 ## What it does
 
 - **Find the right song:** debounced iTunes search by song, artist, or album, artwork and recording metadata, recent searches, and Apple Music song-link lookup. Album links that contain an `i=` song ID work too; album-only links ask for a song.
