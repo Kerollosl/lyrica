@@ -30,45 +30,16 @@ struct ReaderView: View {
         GeometryReader { geometry in
             let stacked = layout == .stacked || (layout == .automatic && (geometry.size.width < 375 || dynamicType.isAccessibilitySize))
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    songHeader.padding(.bottom, 24)
-                    if model.isLoading {
-                        HStack(spacing: 12) { ProgressView(); Text("Finding the words…").foregroundStyle(.secondary) }.padding(.vertical, 40)
-                    } else if let error = model.lyricsError {
-                        NoticeView(title: "The words are still yours to find", message: error, symbol: "text.magnifyingglass")
-                        HStack {
-                            Button("Try again") { Task { await model.load(store: store, settings: settings) } }
-                            Spacer()
-                            Button("Paste lyrics") { showsManual = true }.buttonStyle(.borderedProminent).foregroundStyle(LyricaStyle.paper)
-                        }.padding(.top, 16)
-                    }
-                    if let document = model.document {
-                        if let message = model.translationMessage {
-                            NoticeView(title: model.isTranslating ? "On-device translation" : "Translation", message: message, symbol: "character.bubble")
-                                .padding(.bottom, 12)
-                            if !model.isTranslating && model.translated.isEmpty {
-                                Button("Retry translation") { retry += 1 }.padding(.bottom, 16)
-                            }
-                        }
-                        if model.isTranslating { ProgressView().frame(maxWidth: .infinity).padding(.bottom, 16) }
-                        columnHeader(stacked: stacked).padding(.bottom, 16)
-                        ForEach(Array(document.lines.enumerated()), id: \.offset) { index, line in
-                            lyricRow(index: index, original: line, stacked: stacked)
-                        }
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text(document.attribution)
-                            if document.source == .lrclib {
-                                Link("About LRCLIB", destination: URL(string: "https://lrclib.net")!)
-                            }
-                            if let url = model.song.appleMusicURL {
-                                Link("View in Apple Music", destination: url)
-                            }
-                            Text("Machine translations may miss poetry, slang, or context.")
-                        }
-                        .font(.caption).foregroundStyle(.secondary).padding(.top, 32).padding(.bottom, 24)
+                LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
+                    songHeader
+                        .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 22)
+                    Section {
+                        readerContent(stacked: stacked)
+                            .padding(.horizontal, 16).padding(.top, 18)
+                    } header: {
+                        languageBar
                     }
                 }
-                .padding(.horizontal, 22).padding(.top, 12)
             }
             .background(LyricaStyle.paper)
         }
@@ -79,12 +50,17 @@ struct ReaderView: View {
                 Button {
                     model.toggleFavorite(store: store)
                     if model.isFavorite && !settings.cacheLyrics { showsPermission = true }
-                } label: { Image(systemName: model.isFavorite ? "heart.fill" : "heart") }
+                } label: {
+                    Image(systemName: model.isFavorite ? "heart.fill" : "heart")
+                        .frame(minWidth: 44, minHeight: 44)
+                }
                 .accessibilityLabel(model.isFavorite ? "Remove from favorites" : "Save to favorites")
-                Button { showsOptions = true } label: { Image(systemName: "textformat.size") }.accessibilityLabel("Reader options")
+                Button { showsOptions = true } label: {
+                    Image(systemName: "slider.horizontal.3").frame(minWidth: 44, minHeight: 44)
+                }
+                .accessibilityLabel("Reader options")
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) { languageBar }
         .task { await model.load(store: store, settings: settings) }
         .task(id: translationIdentity) { await model.prepareTranslation(store: store, settings: settings) }
         .background {
@@ -111,26 +87,101 @@ struct ReaderView: View {
         } message: { Text(model.storageError ?? "") }
     }
 
+    @ViewBuilder
+    private func readerContent(stacked: Bool) -> some View {
+        if model.isLoading {
+            VStack(alignment: .leading, spacing: 22) {
+                HStack(spacing: 10) {
+                    ProgressView().tint(LyricaStyle.accent)
+                    Text("Finding the words…").font(.subheadline).foregroundStyle(LyricaStyle.secondary)
+                }
+                ForEach(0..<4) { index in
+                    HStack(spacing: 24) {
+                        RoundedRectangle(cornerRadius: 4).fill(LyricaStyle.stroke).frame(height: 13)
+                        RoundedRectangle(cornerRadius: 4).fill(LyricaStyle.stroke.opacity(0.7)).frame(height: 13)
+                    }
+                    .padding(.trailing, index.isMultiple(of: 2) ? 10 : 38)
+                    .accessibilityHidden(true)
+                }
+            }
+            .padding(.horizontal, 8).padding(.vertical, 18)
+        } else if let error = model.lyricsError {
+            VStack(alignment: .leading, spacing: 16) {
+                NoticeView(title: "Lyrics aren’t available yet", message: error, symbol: "text.magnifyingglass")
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 16) { lyricsRecoveryActions }
+                    VStack(alignment: .leading, spacing: 12) { lyricsRecoveryActions }
+                }
+            }
+            .padding(.bottom, 24)
+        }
+        if let document = model.document {
+            if let message = model.translationMessage {
+                NoticeView(title: model.isTranslating ? "Translating on your iPhone" : "Translation", message: message, symbol: "character.bubble")
+                    .padding(.bottom, 12)
+                if !model.isTranslating && model.translated.isEmpty {
+                    Button("Retry translation") { retry += 1 }
+                        .font(.subheadline.weight(.semibold)).frame(minHeight: 44).padding(.bottom, 12)
+                }
+            }
+            if model.isTranslating {
+                ProgressView().tint(LyricaStyle.accent).frame(maxWidth: .infinity).padding(.bottom, 16)
+            }
+            columnHeader(stacked: stacked).padding(.horizontal, 10).padding(.bottom, 8)
+            ForEach(Array(document.lines.enumerated()), id: \.offset) { index, line in
+                lyricRow(index: index, original: line, stacked: stacked)
+            }
+            VStack(alignment: .leading, spacing: 12) {
+                Divider().padding(.bottom, 8)
+                Text(document.attribution)
+                if document.source == .lrclib {
+                    Link("Lyrics from LRCLIB", destination: URL(string: "https://lrclib.net")!)
+                        .frame(minHeight: 44, alignment: .leading)
+                }
+                if let url = model.song.appleMusicURL {
+                    Link(destination: url) {
+                        Label("View in Apple Music", systemImage: "arrow.up.right")
+                    }
+                    .frame(minHeight: 44, alignment: .leading)
+                }
+                Text("Machine translations may miss poetry, slang, or context.")
+            }
+            .font(.caption).foregroundStyle(LyricaStyle.secondary)
+            .padding(.horizontal, 10).padding(.top, 32).padding(.bottom, 32)
+        }
+    }
+
+    @ViewBuilder
+    private var lyricsRecoveryActions: some View {
+        Button("Paste lyrics") { showsManual = true }.buttonStyle(LyricaPrimaryButtonStyle())
+        Button("Try again") { Task { await model.load(store: store, settings: settings) } }
+            .font(.subheadline.weight(.semibold)).frame(minHeight: 44)
+    }
+
     private var songHeader: some View {
-        HStack(alignment: .center, spacing: 18) {
-            ArtworkView(url: model.song.artworkURL, size: 86)
-            VStack(alignment: .leading, spacing: 6) {
-                Text(model.song.title).font(.system(.title2, design: .serif).weight(.semibold)).fixedSize(horizontal: false, vertical: true)
-                Text(model.song.artist).font(.subheadline).foregroundStyle(.secondary)
-                Text(model.song.album).font(.caption).foregroundStyle(.secondary)
+        HStack(alignment: .center, spacing: 16) {
+            ArtworkView(url: model.song.artworkURL, size: 76)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(model.song.title).font(.title3.weight(.bold)).foregroundStyle(LyricaStyle.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(model.song.artist).font(.subheadline).foregroundStyle(LyricaStyle.secondary)
+                Text(model.song.album).font(.caption).foregroundStyle(LyricaStyle.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
-        }.accessibilityElement(children: .combine)
+        }
+        .accessibilityElement(children: .combine)
     }
 
     private func columnHeader(stacked: Bool) -> some View {
-        HStack {
-            Text(model.sourceLanguage.map { ReaderLanguage(id: $0).name } ?? "Original").frame(maxWidth: .infinity, alignment: .leading)
-            if !stacked { Text(ReaderLanguage(id: model.targetLanguage).name).frame(maxWidth: .infinity, alignment: .leading) }
+        HStack(spacing: 24) {
+            Text(stacked ? "Original & translation" : "Original")
+                .frame(maxWidth: .infinity, alignment: .leading)
+            if !stacked { Text("Translation").frame(maxWidth: .infinity, alignment: .leading) }
         }
-        .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-        .textCase(.uppercase).tracking(1.1)
+        .font(.caption.weight(.semibold)).foregroundStyle(LyricaStyle.secondary)
         .environment(\.layoutDirection, .leftToRight)
+        .accessibilityAddTraits(.isHeader)
     }
 
     private func lyricRow(index: Int, original: String, stacked: Bool) -> some View {
@@ -155,8 +206,9 @@ struct ReaderView: View {
                             .environment(\.layoutDirection, .leftToRight)
                         }
                     }
-                    .padding(.vertical, 10).padding(.horizontal, 10)
-                    .background(selectedLine == index ? LyricaStyle.accent.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: 10))
+                    .padding(.vertical, 12).padding(.horizontal, 10)
+                    .frame(minHeight: 44)
+                    .background(selectedLine == index ? LyricaStyle.accent.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: 12))
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -170,8 +222,8 @@ struct ReaderView: View {
     private func lyricText(_ text: String, language: String?, translated: Bool) -> some View {
         let rtl = language.map { ReaderLanguage(id: $0).isRTL } ?? false
         return Text(text)
-            .font(.system(size: scaledSize * settings.fontSize / 18, weight: .regular, design: .serif))
-            .foregroundStyle(translated ? .secondary : .primary)
+            .font(.system(size: scaledSize * settings.fontSize / 18, weight: .regular))
+            .foregroundStyle(translated ? LyricaStyle.secondary : LyricaStyle.ink)
             .lineSpacing(5)
             .multilineTextAlignment(.leading)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -181,20 +233,63 @@ struct ReaderView: View {
     }
 
     private var languageBar: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "character.bubble").foregroundStyle(LyricaStyle.accent)
-            Menu {
-                Picker("Translation language", selection: $model.targetLanguage) {
-                    ForEach(languages.including(model.targetLanguage)) { Text($0.name).tag($0.id) }
+        Group {
+            if dynamicType.isAccessibilitySize {
+                VStack(spacing: 8) { sourceLanguageMenu; targetLanguageMenu }
+            } else {
+                HStack(spacing: 12) {
+                    sourceLanguageMenu
+                    Image(systemName: "arrow.right").font(.caption.weight(.semibold))
+                        .foregroundStyle(LyricaStyle.accent).accessibilityHidden(true)
+                    targetLanguageMenu
                 }
-            } label: {
-                HStack { Text(ReaderLanguage(id: model.targetLanguage).name).fontWeight(.semibold); Image(systemName: "chevron.up.chevron.down").font(.caption) }
-            }.accessibilityLabel("Translation language, \(ReaderLanguage(id: model.targetLanguage).name)")
-            Spacer()
-            Text("ON DEVICE").font(.caption2.weight(.semibold)).tracking(1).foregroundStyle(.secondary)
+                .environment(\.layoutDirection, .leftToRight)
+            }
         }
-        .padding(.horizontal, 24).padding(.vertical, 16)
-        .background(.regularMaterial)
+        .padding(.horizontal, 20).padding(.vertical, 12)
+        .background(LyricaStyle.paper)
+        .overlay(alignment: .bottom) { Rectangle().fill(LyricaStyle.stroke).frame(height: 1) }
+    }
+
+    private var sourceLanguageMenu: some View {
+        Menu {
+            Picker("Original language", selection: $model.sourceOverride) {
+                Text("Detect automatically").tag("auto")
+                ForEach(languages.including(model.sourceLanguage ?? "es")) { Text($0.name).tag($0.id) }
+            }
+        } label: {
+            languageControl(title: model.sourceOverride == "auto" ? "Original · Auto" : "Original",
+                            language: model.sourceLanguage.map { ReaderLanguage(id: $0).name } ?? "Detect language")
+        }
+        .accessibilityLabel("Original language, \(model.sourceLanguage.map { ReaderLanguage(id: $0).name } ?? "detect automatically")")
+    }
+
+    private var targetLanguageMenu: some View {
+        Menu {
+            Picker("Translation language", selection: $model.targetLanguage) {
+                ForEach(languages.including(model.targetLanguage)) { Text($0.name).tag($0.id) }
+            }
+        } label: {
+            languageControl(title: "Translate to", language: ReaderLanguage(id: model.targetLanguage).name)
+        }
+        .accessibilityLabel("Translation language, \(ReaderLanguage(id: model.targetLanguage).name)")
+    }
+
+    private func languageControl(title: String, language: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(.caption).foregroundStyle(LyricaStyle.secondary)
+            HStack(spacing: 6) {
+                Text(language).font(.subheadline.weight(.semibold)).foregroundStyle(LyricaStyle.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.down").font(.caption2.weight(.semibold)).foregroundStyle(LyricaStyle.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .padding(.horizontal, 12).padding(.vertical, 8)
+        .background(LyricaStyle.surface, in: RoundedRectangle(cornerRadius: 14))
+        .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(LyricaStyle.stroke, lineWidth: 1) }
+        .contentShape(RoundedRectangle(cornerRadius: 14))
     }
 
     private var options: some View {
@@ -202,7 +297,7 @@ struct ReaderView: View {
         return NavigationStack {
             Form {
                 Section("Reading") {
-                    Picker("Layout", selection: $layout) { ForEach(ReaderLayout.allCases) { Text($0.rawValue.capitalized).tag($0) } }
+                    Picker("Layout", selection: $layout) { ForEach(ReaderLayout.allCases) { Text($0.title).tag($0) } }
                     LabeledContent("Text size", value: "\(Int(settings.fontSize)) pt")
                     Slider(value: $settings.fontSize, in: 14...30, step: 1).accessibilityLabel("Lyrics text size")
                 }
@@ -217,13 +312,20 @@ struct ReaderView: View {
                     Button("Paste or replace lyrics") { manualAfterOptions = true; showsOptions = false }
                 }
             }
+            .scrollContentBackground(.hidden).background(LyricaStyle.paper)
             .navigationTitle("Reader options").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showsOptions = false } } }
         }.presentationDetents([.medium, .large])
     }
 }
 
-enum ReaderLayout: String, Identifiable, CaseIterable { case automatic, columns, stacked; var id: String { rawValue } }
+enum ReaderLayout: String, Identifiable, CaseIterable {
+    case automatic, columns, stacked
+    var id: String { rawValue }
+    var title: String {
+        switch self { case .automatic: "Automatic"; case .columns: "Side by side"; case .stacked: "Stacked" }
+    }
+}
 
 private struct TranslationWorker: View {
     let request: TranslationRequest
@@ -245,10 +347,12 @@ struct ManualLyricsView: View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 16) {
                 NoticeView(title: "Bring your own words", message: "Paste lyrics you’re permitted to use. Keep a line break between each lyric and a blank line between verses.")
-                TextEditor(text: $text).font(.body).padding(8).background(.quaternary, in: RoundedRectangle(cornerRadius: 12))
+                TextEditor(text: $text).font(.body).scrollContentBackground(.hidden).padding(10)
+                    .background(LyricaStyle.surface, in: RoundedRectangle(cornerRadius: 16))
+                    .overlay { RoundedRectangle(cornerRadius: 16).strokeBorder(LyricaStyle.stroke, lineWidth: 1) }
                     .accessibilityLabel("Original lyrics")
                 Text("Only metadata is saved unless you enable permitted offline caching.").font(.footnote).foregroundStyle(.secondary)
-            }.padding()
+            }.padding(20).background(LyricaStyle.paper)
             .navigationTitle("Paste lyrics").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
