@@ -51,3 +51,15 @@ The app can be hosted by any static HTTPS server. For GitHub Pages:
 The connected authoring credential could push code but GitHub returned HTTP 403 when enabling Pages. No live deployment is claimed until the workflow succeeds. Subsequent publications use the same manual workflow; no new PR is needed.
 
 Lyrics and translations remain subject to their owners' rights. API access is not a license to store, publish, or redistribute material. See the repository README for attribution, licensing limitations, and privacy details.
+
+## Modern UI and visual review
+
+The current interface uses local Manrope fonts (SIL Open Font License included), local SVG icons, compact responsive navigation, clear reading surfaces, and artwork from actual saved history. No external font or icon service is called. The reader retains paired rows, independent RTL direction, keyboard focus, large text, and a manual stacked layout. Reader options group text size, layout, and manual lyrics/translation entry. Favorites distinguish permitted offline content from metadata bookmarks.
+
+See the [shared design system](../docs/DESIGN.md), [real screenshot matrix](../docs/web/screenshots/), and [updated MP4](../docs/lyrica-walkthrough.mp4). To regenerate the 24-screen matrix with a local server running:
+
+```sh
+python3 tests/web/capture.py --output /tmp/lyrica-redesign
+```
+
+Captures cover Discover, Reader, Library, and Settings at 390, 768, and 1440px in light/dark appearance, using only original demo material. Mobile captures show the real viewport and fixed navigation.

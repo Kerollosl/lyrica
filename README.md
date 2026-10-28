@@ -8,7 +8,7 @@ Built with **SwiftUI · Swift · iOS 18+ · SwiftData · Apple Translation**.
 
 ## Video walkthrough
 
-[Watch the 56-second MP4 walkthrough](docs/lyrica-walkthrough.mp4). Recorded from the running web app, with captions and original fictional demo lyrics. Included translations demonstrate the interface; this video does not demonstrate a browser model download.
+[Watch the updated MP4 walkthrough](docs/lyrica-walkthrough.mp4). Recorded from the running web app, with captions and original fictional demo lyrics. Included translations demonstrate the interface; this video does not demonstrate a browser model download.
 
 ## Web version
 
@@ -26,15 +26,15 @@ These are real screenshots from the browser implementation:
 
 See [web setup, browser compatibility, tests, and free hosting](web/README.md). GitHub Pages deployment is prepared; repository Pages must be enabled before a live URL is available.
 
-## Design previews
+## Modern interface
 
-These are **illustrated design previews**, not screenshots from a running simulator. All song names, artwork, and lyrics in these previews are original fictional demo material. The implementation uses native SwiftUI controls and may differ in exact spacing and system chrome.
+The web and iOS apps now share a refined visual system: soft surfaces, clear sans-serif typography, artwork-led libraries, paired language controls, and readable light/dark themes. Web navigation adapts from a compact header to a phone bottom bar; iPhone keeps native tabs and Dynamic Type.
 
-<p>
-  <img src="docs/previews/search.svg" width="30%" alt="Illustrated Lyrica search screen" />
-  <img src="docs/previews/reader.svg" width="30%" alt="Illustrated bilingual lyrics reader" />
-  <img src="docs/previews/library.svg" width="30%" alt="Illustrated saved songs library" />
-</p>
+[Design system](docs/DESIGN.md) · [24 real web screenshots](docs/web/screenshots/) · [Device acceptance checklist](docs/DEVICE_TESTING.md)
+
+<p><img src="docs/web/mobile.png" width="24%" alt="Modern mobile reader in dark mode" /> <img src="docs/web/settings.png" width="42%" alt="Reading, appearance, and storage settings in dark mode" /></p>
+
+The older illustrated concepts in `docs/previews/` are historical design studies. The screenshots above are captured from the current running app; original demo lyrics are labeled, and no screenshot demonstrates a model download.
 
 ## What it does
 
@@ -96,11 +96,11 @@ xcodebuild test \
 
 The GitHub Actions workflow runs core tests, compiles the iOS app, and runs native persistence tests on macOS with an available iPhone simulator. Read the actual workflow result before treating Apple-SDK validation as passed.
 
-### Initial implementation verification
+### Verification
 
-The implementation was authored in a Linux environment without Xcode, Apple SDKs, or an iOS simulator. **An iOS build, native SwiftData test run, on-device Translation flow, and device accessibility review are not verified by that environment.** Check the pull request and CI output for any subsequent validation. No illustrated preview is presented as runtime evidence.
+The app is authored in Linux; native compilation and simulator execution run in GitHub’s macOS CI. Web checks run domain tests and deterministic browser workflows, including a 390/768/1440px light/dark matrix, RTL, large text, storage, failure states, keyboard access, and offline shell behavior. The native workflow builds device and simulator paths, runs core and persistence/view-model tests, and captures light/dark Search screens. See the actual [workflow results](https://github.com/Kerollosl/lyrica/actions).
 
-For a release, also run the [device acceptance checklist](docs/DEVICE_TESTING.md).
+Real-device Translation downloads, translation quality, VoiceOver, and device-specific behavior remain part of the [device acceptance checklist](docs/DEVICE_TESTING.md).
 
 ## Architecture
 

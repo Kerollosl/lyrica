@@ -77,6 +77,9 @@ def test_reading_and_storage(browser):
     expect(page.get_by_text(DEMO_FIRST_TRANSLATION, exact=True)).to_be_visible()
     navigate(page, "library")
     expect(page.locator(".song-duration", has_text="Saved")).to_be_visible()
+    page.locator('[data-action="favorites"]').click()
+    expect(page.locator('.favorite-grid .song-duration.is-offline')).to_be_visible()
+    page.locator('[data-action="history"]').click()
 
     # Search and LRCLIB requests use original fixture material.
     navigate(page, "search")

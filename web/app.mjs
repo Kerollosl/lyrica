@@ -86,7 +86,7 @@ function cover(song, className = "") {
 }
 function songRow(song, index, action = "open-result", offline = false) {
   const minutes = `${Math.floor(song.duration / 60)}:${String(Math.floor(song.duration % 60)).padStart(2, "0")}`;
-  return `<button class="song-row" data-action="${action}" data-index="${index}">${cover(song)}<span class="song-info"><strong>${e(song.title)}</strong><span>${e(song.artist)}</span><small>${e(song.album)}</small></span><span class="song-duration">${offline ? `${icon("download")} Saved` : song.duration ? minutes : "Demo"}</span>${icon("chevron")}</button>`;
+  return `<button class="song-row" data-action="${action}" data-index="${index}">${cover(song)}<span class="song-info"><strong>${e(song.title)}</strong><span>${e(song.artist)}</span><small>${e(song.album)}</small></span><span class="song-duration ${offline ? "is-offline" : ""}">${offline ? `${icon("download")} Saved` : song.duration ? minutes : "Demo"}</span>${icon("chevron")}</button>`;
 }
 function render() {
   const focused = main.contains(document.activeElement)

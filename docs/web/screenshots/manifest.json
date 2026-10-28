@@ -1,0 +1,223 @@
+{
+  "capturedAt": "2026-10-28T18:38:45.038798+00:00",
+  "baseURL": "http://127.0.0.1:4173",
+  "content": "Real application UI using the original Lyrica Studio bilingual demo; no commercial lyrics or live translation claim.",
+  "captures": [
+    {
+      "file": "reader-light-390.png",
+      "view": "reader",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "library-light-390.png",
+      "view": "library",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "settings-light-390.png",
+      "view": "settings",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "search-light-390.png",
+      "view": "search",
+      "theme": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "reader-dark-390.png",
+      "view": "reader",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "library-dark-390.png",
+      "view": "library",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "settings-dark-390.png",
+      "view": "settings",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "search-dark-390.png",
+      "view": "search",
+      "theme": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      }
+    },
+    {
+      "file": "reader-light-768.png",
+      "view": "reader",
+      "theme": "light",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      }
+    },
+    {
+      "file": "library-light-768.png",
+      "view": "library",
+      "theme": "light",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      }
+    },
+    {
+      "file": "settings-light-768.png",
+      "view": "settings",
+      "theme": "light",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      }
+    },
+    {
+      "file": "search-light-768.png",
+      "view": "search",
+      "theme": "light",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      }
+    },
+    {
+      "file": "reader-dark-768.png",
+      "view": "reader",
+      "theme": "dark",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      }
+    },
+    {
+      "file": "library-dark-768.png",
+      "view": "library",
+      "theme": "dark",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      }
+    },
+    {
+      "file": "settings-dark-768.png",
+      "view": "settings",
+      "theme": "dark",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      }
+    },
+    {
+      "file": "search-dark-768.png",
+      "view": "search",
+      "theme": "dark",
+      "viewport": {
+        "width": 768,
+        "height": 1024
+      }
+    },
+    {
+      "file": "reader-light-1440.png",
+      "view": "reader",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1050
+      }
+    },
+    {
+      "file": "library-light-1440.png",
+      "view": "library",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1050
+      }
+    },
+    {
+      "file": "settings-light-1440.png",
+      "view": "settings",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1050
+      }
+    },
+    {
+      "file": "search-light-1440.png",
+      "view": "search",
+      "theme": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1050
+      }
+    },
+    {
+      "file": "reader-dark-1440.png",
+      "view": "reader",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1050
+      }
+    },
+    {
+      "file": "library-dark-1440.png",
+      "view": "library",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1050
+      }
+    },
+    {
+      "file": "settings-dark-1440.png",
+      "view": "settings",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1050
+      }
+    },
+    {
+      "file": "search-dark-1440.png",
+      "view": "search",
+      "theme": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1050
+      }
+    }
+  ]
+}
