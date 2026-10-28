@@ -6,6 +6,22 @@ Lyrica is a native iPhone lyrics reader that brings the original words and an on
 
 Built with **SwiftUI · Swift · iOS 18+ · SwiftData · Apple Translation**.
 
+## Web version
+
+The browser companion is included in [`web/`](web/README.md), committed directly to `main` alongside the iOS app. Run it without installing dependencies:
+
+```sh
+python3 -m http.server 4173 --directory web
+```
+
+Open **http://localhost:4173**. Search real songs or choose **Open the bilingual demo** to test immediately. Web translation uses the browser’s on-device Translator API in supported desktop Chrome environments; Apple Translation is exclusive to iOS. Other browsers support pasted translations and the included original demo. Both versions use free services and opt-in local lyric storage.
+
+These are real screenshots from the browser implementation:
+
+<p><img src="docs/web/discover.png" width="48%" alt="Lyrica Web discovery screen" /> <img src="docs/web/reader.png" width="48%" alt="Lyrica Web aligned bilingual reader" /></p>
+
+See [web setup, browser compatibility, tests, and free hosting](web/README.md). GitHub Pages deployment is prepared; repository Pages must be enabled before a live URL is available.
+
 ## Design previews
 
 These are **illustrated design previews**, not screenshots from a running simulator. All song names, artwork, and lyrics in these previews are original fictional demo material. The implementation uses native SwiftUI controls and may differ in exact spacing and system chrome.

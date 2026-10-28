@@ -1,0 +1,29 @@
+name: Web checks
+on:
+  push:
+    branches: [main]
+    paths: ['web/**', 'tests/web/**', '.github/workflows/web.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Test domain logic
+        run: node --test tests/web/*.test.mjs
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install browser test tools
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+      - name: Verify browser flows
+        run: |
+          python -m http.server 4173 --bind 127.0.0.1 --directory web > /tmp/lyrica-web-server.log 2>&1 &
+          python tests/web/browser.py
