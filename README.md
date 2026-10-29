@@ -1,8 +1,6 @@
 # Lyrica
 
-**Every lyric. A little closer.**
-
-Lyrica is a native iPhone lyrics reader that brings the original words and an on-device translation into one calm, aligned view. Search a song or paste its Apple Music link, choose the recording, and read at your own pace. There is no playback, account, subscription, paid API, or app backend.
+Lyrica is a native iPhone app for reading original lyrics alongside on-device translations. Search for a song or paste its Apple Music link, select the recording, and open the bilingual reader. There is no playback, account, subscription, paid API, or app backend.
 
 Built with **SwiftUI · Swift · iOS 18+ · SwiftData · Apple Translation**.
 
@@ -18,21 +16,21 @@ The browser companion is included in [`web/`](web/README.md), committed directly
 python3 -m http.server 4173 --directory web
 ```
 
-Open **http://localhost:4173**. Search real songs or choose **Open the bilingual demo** to test immediately. Web translation uses the browser’s on-device Translator API in supported desktop Chrome environments; Apple Translation is exclusive to iOS. Other browsers support pasted translations and the included original demo. Both versions use free services and opt-in local lyric storage.
+Open **http://localhost:4173**. Search real songs or choose **Open example** to test immediately. Web translation uses the browser’s on-device Translator API in supported desktop Chrome environments; Apple Translation is exclusive to iOS. Other browsers support pasted translations and the included original demo. Both versions use free services and opt-in local lyric storage.
 
 These are real screenshots from the browser implementation:
 
-<p><img src="docs/web/discover.png" width="48%" alt="Lyrica Web discovery screen" /> <img src="docs/web/reader.png" width="48%" alt="Lyrica Web aligned bilingual reader" /></p>
+<p><img src="docs/web/discover.png" width="48%" alt="Lyrica Web search screen" /> <img src="docs/web/reader.png" width="48%" alt="Lyrica Web aligned bilingual reader" /></p>
 
 See [web setup, browser compatibility, tests, and free hosting](web/README.md). GitHub Pages deployment is prepared; repository Pages must be enabled before a live URL is available.
 
-## Modern interface
+## Interface
 
-The web and iOS apps now share a refined visual system: soft surfaces, clear sans-serif typography, artwork-led libraries, paired language controls, and readable light/dark themes. Web navigation adapts from a compact header to a phone bottom bar; iPhone keeps native tabs and Dynamic Type.
+The web and iOS apps use system fonts, neutral light/dark backgrounds, blue controls, compact spacing, and flat lyric rows. The iPhone app uses native lists, forms, navigation, and Dynamic Type. Web navigation adapts from a plain header to a phone tab bar; both readers keep original and translated lines aligned.
 
 [Design system](docs/DESIGN.md) · [24 real web screenshots](docs/web/screenshots/) · [Device acceptance checklist](docs/DEVICE_TESTING.md)
 
-<p><img src="docs/web/mobile.png" width="24%" alt="Modern mobile reader in dark mode" /> <img src="docs/web/settings.png" width="42%" alt="Reading, appearance, and storage settings in dark mode" /></p>
+<p><img src="docs/web/mobile.png" width="24%" alt="Mobile bilingual reader in dark mode" /> <img src="docs/web/settings.png" width="42%" alt="Reading, appearance, and storage settings in dark mode" /></p>
 
 The older illustrated concepts in `docs/previews/` are historical design studies. The screenshots above are captured from the current running app; original demo lyrics are labeled, and no screenshot demonstrates a model download.
 

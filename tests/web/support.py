@@ -75,7 +75,7 @@ def set_theme(page, theme):
 
 
 def open_demo(page):
-    page.get_by_role("button", name="Open the bilingual demo").click()
+    page.get_by_role("button", name="Open example").click()
     page.get_by_text(DEMO_FIRST_TRANSLATION, exact=True).wait_for()
 
 
@@ -91,4 +91,5 @@ def screenshot(page, output, name):
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
     page.evaluate("document.fonts.ready")
+    page.mouse.move(0, 0)
     page.screenshot(path=str(output / name), full_page=page.viewport_size["width"] >= 600, animations="disabled")

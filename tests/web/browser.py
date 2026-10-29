@@ -21,7 +21,7 @@ def test_reading_and_storage(browser):
     page.on("pageerror", lambda error: errors.append(str(error)))
     original_api_fixtures(page)
     visit(page)
-    expect(page.get_by_role("heading", name="Understand every line.")).to_be_visible()
+    expect(page.get_by_role("heading", name="Search songs")).to_be_visible()
 
     # The first keyboard destination skips the application chrome.
     page.keyboard.press("Tab")
@@ -266,6 +266,86 @@ def test_viewports(browser):
     print("PASS viewport matrix: 390/768/1440 in light/dark, all pages, Arabic, largest text, stacked layout")
 
 
+def test_compact_layout_and_forced_colors(browser):
+    # Long metadata comes through the real search flow, including an artist name
+    # with no break opportunities. It must not widen the row or the page.
+    context = browser.new_context(viewport={"width": 390, "height": 844}, service_workers="block")
+    page = context.new_page()
+    metadata = {
+        "trackName": "Title" * 40,
+        "artistName": "Artist" * 40,
+        "collectionName": "Album" * 40,
+    }
+    page.route(
+        "https://itunes.apple.com/**",
+        lambda route: route.fulfill(json={"results": [{
+            "kind": "song", "trackId": 789, "trackTimeMillis": 180000,
+            **metadata,
+        }]}),
+    )
+    visit(page)
+    page.get_by_role("searchbox").fill("Long metadata fixture")
+    page.get_by_role("button", name="Search", exact=True).click()
+    row = page.locator('[data-action="open-result"]').first
+    expect(row).to_be_visible()
+    expect(row.locator(".song-info > span")).to_have_text(metadata["artistName"])
+    assert_no_overflow(page, "unbroken song metadata at 390")
+    bounds = row.bounding_box()
+    for selector in [".song-info strong", ".song-info > span", ".song-info small"]:
+        text_bounds = row.locator(selector).bounding_box()
+        assert text_bounds["x"] >= bounds["x"] - 1, f"Metadata escapes left edge: {selector}"
+        assert text_bounds["x"] + text_bounds["width"] <= bounds["x"] + bounds["width"] + 1, f"Metadata escapes right edge: {selector}"
+    context.close()
+
+    # Both permission choices remain visible inside the dialog on a small
+    # viewport; checking only document width misses clipped negative overflow.
+    context = browser.new_context(viewport={"width": 320, "height": 700}, service_workers="block")
+    page = context.new_page()
+    visit(page)
+    navigate(page, "settings")
+    page.locator("#cache").click()
+    dialog = page.locator("dialog")
+    expect(dialog).to_be_visible()
+    bounds = dialog.bounding_box()
+    for name in ["Cancel", "Enable permitted offline storage"]:
+        button = dialog.get_by_role("button", name=name, exact=True)
+        expect(button).to_be_visible()
+        button_bounds = button.bounding_box()
+        assert button_bounds["x"] >= bounds["x"], f"Permission choice clipped on the left: {name}"
+        assert button_bounds["x"] + button_bounds["width"] <= bounds["x"] + bounds["width"], f"Permission choice clipped on the right: {name}"
+        assert button_bounds["y"] + button_bounds["height"] <= bounds["y"] + bounds["height"], f"Permission choice clipped below dialog: {name}"
+    dialog.get_by_role("button", name="Cancel", exact=True).click()
+    expect(dialog).not_to_be_visible()
+    context.close()
+
+    # System high-contrast colors suppress painted backgrounds. The cache
+    # control needs native checked-state rendering and selections need an edge.
+    context = browser.new_context(viewport={"width": 390, "height": 844}, service_workers="block", forced_colors="active")
+    page = context.new_page()
+    visit(page)
+    navigate(page, "settings")
+    cache = page.locator("#cache")
+    assert cache.evaluate("el => getComputedStyle(el).appearance") != "none", "Cache checkbox loses native visibility in forced colors"
+    cache.click()
+    page.get_by_role("button", name="Enable permitted offline storage").click()
+    expect(cache).to_be_checked()
+    navigate(page, "search")
+    open_demo(page)
+    line = page.locator(".lyric-row").first
+    line.click()
+    expect(line).to_have_attribute("aria-pressed", "true")
+    edge = line.evaluate("el => ({width: parseFloat(getComputedStyle(el).outlineWidth), style: getComputedStyle(el).outlineStyle})")
+    assert edge["width"] > 0 and edge["style"] != "none", f"Selected lyric is invisible in forced colors: {edge}"
+    navigate(page, "library")
+    selected = page.get_by_role("button", name="Favorites", exact=True)
+    selected.click()
+    expect(selected).to_have_attribute("aria-pressed", "true")
+    edge = selected.evaluate("el => ({width: parseFloat(getComputedStyle(el).outlineWidth), style: getComputedStyle(el).outlineStyle})")
+    assert edge["width"] > 0 and edge["style"] != "none", f"Selected library filter is invisible in forced colors: {edge}"
+    context.close()
+    print("PASS compact/high-contrast regressions: unbroken song metadata, 320px permission choices, visible cache and selected states")
+
+
 def test_offline_shell(browser):
     context = browser.new_context(service_workers="allow")
     page = context.new_page()
@@ -276,7 +356,7 @@ def test_offline_shell(browser):
     context.set_offline(True)
     page.reload()
     page.wait_for_load_state("networkidle")
-    expect(page.get_by_role("button", name="Open the bilingual demo")).to_be_visible()
+    expect(page.get_by_role("button", name="Open example")).to_be_visible()
     open_demo(page)
     context.close()
     print("PASS offline: service-worker shell and authored bilingual demo")
@@ -290,6 +370,7 @@ if __name__ == "__main__":
             test_search_states(browser)
             test_lyrics_error_state(browser)
             test_viewports(browser)
+            test_compact_layout_and_forced_colors(browser)
             test_offline_shell(browser)
         finally:
             browser.close()

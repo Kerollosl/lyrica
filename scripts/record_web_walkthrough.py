@@ -52,7 +52,7 @@ def record(base_url: str, output: Path) -> None:
             page.goto(base_url.rstrip("/") + "/")
             page.wait_for_load_state("networkidle")
             page.evaluate("document.fonts.ready")
-            expect(page.get_by_role("heading", name="Understand every line.")).to_be_visible()
+            expect(page.get_by_role("heading", name="Search songs")).to_be_visible()
             started = time.monotonic()
             page.evaluate("""() => {
                 const style = document.createElement('style');
@@ -60,13 +60,13 @@ def record(base_url: str, output: Path) -> None:
                     #walkthrough-caption {
                         position:fixed;bottom:22px;left:50%;transform:translateX(-50%);
                         z-index:9999;max-width:calc(100vw - 64px);box-sizing:border-box;
-                        background:#20231ff5;color:#fff;padding:15px 24px;border-radius:16px;
-                        border:1px solid #ffffff22;font:500 14px/1.5 Manrope,system-ui,sans-serif;
-                        box-shadow:0 8px 30px #0002;text-align:center;pointer-events:none;
+                        background:#1c1c1ef5;color:#fff;padding:15px 24px;border-radius:8px;
+                        font:500 14px/1.5 system-ui,sans-serif;
+                        text-align:center;pointer-events:none;
                     }
                     #walkthrough-pointer {
-                        position:fixed;width:22px;height:22px;border:2px solid #C45238;
-                        border-radius:50%;background:#C4523822;z-index:99999;
+                        position:fixed;width:22px;height:22px;border:2px solid #0066CC;
+                        border-radius:50%;background:#0066CC22;z-index:99999;
                         pointer-events:none;left:1140px;top:760px;
                         transform:translate(-50%,-50%);
                     }`;
@@ -99,13 +99,13 @@ def record(base_url: str, output: Path) -> None:
                 if details.get_attribute("open") is None:
                     click(details.locator("summary[aria-label='Reader options']"), 350)
 
-            caption("Lyrica · Understand every line.", 2200)
+            caption("Lyrica · Lyrics and translations", 2200)
             click(page.locator("#song-search"), 250)
             caption("Find a song or paste an Apple Music song link. No account needed.", 2000)
             page.keyboard.press("Escape")
-            click(page.get_by_role("heading", name="Understand every line."), 200)
+            click(page.get_by_role("heading", name="Search songs"), 200)
             caption("Explore an original Spanish verse with included example translations.", 1500)
-            click(page.get_by_role("button", name="Open the bilingual demo"))
+            click(page.get_by_role("button", name="Open example"))
             expect(page.get_by_text("I open the window to the day", exact=True)).to_be_visible()
             caption("Original Spanish on the left. Its English meaning alongside it.", 2200)
             click(page.locator(".lyric-row").first)

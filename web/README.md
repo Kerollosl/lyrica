@@ -12,7 +12,7 @@ python3 -m http.server 4173 --directory web
 
 Open **http://localhost:4173**. Alternatively, `cd web && npm run dev`. Use HTTP/HTTPS, not `file://`, because modules, IndexedDB, and service workers require an appropriate origin. Localhost is a secure context for supported browser APIs.
 
-Click **Open the bilingual demo** to immediately test the aligned reader, Arabic RTL, line highlighting, font size, layout switching, and language selection in any modern browser. The demo is original fictional material with included example translations, clearly labeled in the interface. It is not a live translation result or commercial song.
+Click **Open example** to immediately test the aligned reader, Arabic RTL, line highlighting, font size, layout switching, and language selection in any modern browser. The demo is original fictional material with included example translations, clearly labeled in the interface. It is not a live translation result or commercial song.
 
 For real music, search by song/artist/album or paste an Apple Music song URL. Select the recording, retrieve its LRCLIB lyrics, and choose a target language. Paste original lyrics when unavailable. The iTunes storefront defaults to US for text search and respects the URL storefront for links.
 
@@ -52,9 +52,9 @@ The connected authoring credential could push code but GitHub returned HTTP 403 
 
 Lyrics and translations remain subject to their owners' rights. API access is not a license to store, publish, or redistribute material. See the repository README for attribution, licensing limitations, and privacy details.
 
-## Modern UI and visual review
+## Interface and visual review
 
-The current interface uses local Manrope fonts (SIL Open Font License included), local SVG icons, compact responsive navigation, clear reading surfaces, and artwork from actual saved history. No external font or icon service is called. The reader retains paired rows, independent RTL direction, keyboard focus, large text, and a manual stacked layout. Reader options group text size, layout, and manual lyrics/translation entry. Favorites distinguish permitted offline content from metadata bookmarks.
+The interface uses system fonts, neutral light/dark surfaces, blue actions, compact controls, and flat rows with separators. Navigation moves from a plain header to a phone tab bar. Local SVG icons need no external service. The reader retains paired rows, independent RTL direction, keyboard focus, adjustable text, and a manual stacked layout. Reader options group text size, layout, and manual lyrics/translation entry. Favorites distinguish permitted offline content from metadata bookmarks.
 
 See the [shared design system](../docs/DESIGN.md), [real screenshot matrix](../docs/web/screenshots/), and [updated MP4](../docs/lyrica-walkthrough.mp4). To regenerate the 24-screen matrix with a local server running:
 
@@ -62,4 +62,4 @@ See the [shared design system](../docs/DESIGN.md), [real screenshot matrix](../d
 python3 tests/web/capture.py --output /tmp/lyrica-redesign
 ```
 
-Captures cover Discover, Reader, Library, and Settings at 390, 768, and 1440px in light/dark appearance, using only original demo material. Mobile captures show the real viewport and fixed navigation.
+Captures cover Search, Reader, Library, and Settings at 390, 768, and 1440px in light/dark appearance, using only original demo material. Mobile captures show the real viewport and fixed navigation.

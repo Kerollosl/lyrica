@@ -60,7 +60,7 @@ def capture(args):
                     navigate(page, "settings")
                     take("settings")
                     navigate(page, "search")
-                    expect(page.get_by_role("heading", name="Understand every line.")).to_be_visible()
+                    expect(page.get_by_role("heading", name="Search songs")).to_be_visible()
                     take("search")
                     assert not errors, errors
                     context.close()

@@ -1,11 +1,10 @@
-const CACHE = "lyrica-shell-v2";
+const CACHE = "lyrica-shell-v3";
 const SHELL = [
   "./",
   "./index.html",
   "./style.css",
   "./app.mjs",
   "./icons.mjs",
-  "./fonts/manrope-latin.woff2",
   "./core.mjs",
   "./services.mjs",
   "./store.mjs",
