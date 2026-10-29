@@ -32,10 +32,10 @@ struct ReaderView: View {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
                     songHeader
-                        .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 22)
+                        .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 16)
                     Section {
                         readerContent(stacked: stacked)
-                            .padding(.horizontal, 16).padding(.top, 18)
+                            .padding(.horizontal, 16).padding(.top, 12)
                     } header: {
                         languageBar
                     }
@@ -93,7 +93,7 @@ struct ReaderView: View {
             VStack(alignment: .leading, spacing: 22) {
                 HStack(spacing: 10) {
                     ProgressView().tint(LyricaStyle.accent)
-                    Text("Finding the words…").font(.subheadline).foregroundStyle(LyricaStyle.secondary)
+                    Text("Finding lyrics…").font(.subheadline).foregroundStyle(LyricaStyle.secondary)
                 }
                 ForEach(0..<4) { index in
                     HStack(spacing: 24) {
@@ -153,16 +153,16 @@ struct ReaderView: View {
 
     @ViewBuilder
     private var lyricsRecoveryActions: some View {
-        Button("Paste lyrics") { showsManual = true }.buttonStyle(LyricaPrimaryButtonStyle())
+        Button("Paste lyrics") { showsManual = true }.buttonStyle(.borderedProminent).controlSize(.large)
         Button("Try again") { Task { await model.load(store: store, settings: settings) } }
             .font(.subheadline.weight(.semibold)).frame(minHeight: 44)
     }
 
     private var songHeader: some View {
         HStack(alignment: .center, spacing: 16) {
-            ArtworkView(url: model.song.artworkURL, size: 76)
+            ArtworkView(url: model.song.artworkURL, size: 64)
             VStack(alignment: .leading, spacing: 5) {
-                Text(model.song.title).font(.title3.weight(.bold)).foregroundStyle(LyricaStyle.ink)
+                Text(model.song.title).font(.headline).foregroundStyle(LyricaStyle.ink)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(model.song.artist).font(.subheadline).foregroundStyle(LyricaStyle.secondary)
                 Text(model.song.album).font(.caption).foregroundStyle(LyricaStyle.secondary)
@@ -206,9 +206,9 @@ struct ReaderView: View {
                             .environment(\.layoutDirection, .leftToRight)
                         }
                     }
-                    .padding(.vertical, 12).padding(.horizontal, 10)
+                    .padding(.vertical, 10).padding(.horizontal, 10)
                     .frame(minHeight: 44)
-                    .background(selectedLine == index ? LyricaStyle.accent.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: 12))
+                    .background(selectedLine == index ? LyricaStyle.accent.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: 6))
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -240,13 +240,13 @@ struct ReaderView: View {
                 HStack(spacing: 12) {
                     sourceLanguageMenu
                     Image(systemName: "arrow.right").font(.caption.weight(.semibold))
-                        .foregroundStyle(LyricaStyle.accent).accessibilityHidden(true)
+                        .foregroundStyle(LyricaStyle.secondary).accessibilityHidden(true)
                     targetLanguageMenu
                 }
                 .environment(\.layoutDirection, .leftToRight)
             }
         }
-        .padding(.horizontal, 20).padding(.vertical, 12)
+        .padding(.horizontal, 20).padding(.vertical, 10)
         .background(LyricaStyle.paper)
         .overlay(alignment: .bottom) { Rectangle().fill(LyricaStyle.stroke).frame(height: 1) }
     }
@@ -277,19 +277,17 @@ struct ReaderView: View {
 
     private func languageControl(title: String, language: String) -> some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(title).font(.caption).foregroundStyle(LyricaStyle.secondary)
+            Text(title).font(.footnote).foregroundStyle(LyricaStyle.secondary)
             HStack(spacing: 6) {
-                Text(language).font(.subheadline.weight(.semibold)).foregroundStyle(LyricaStyle.ink)
+                Text(language).font(.subheadline).foregroundStyle(LyricaStyle.accent)
                     .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
                 Image(systemName: "chevron.down").font(.caption2.weight(.semibold)).foregroundStyle(LyricaStyle.secondary)
             }
         }
         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-        .padding(.horizontal, 12).padding(.vertical, 8)
-        .background(LyricaStyle.surface, in: RoundedRectangle(cornerRadius: 14))
-        .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(LyricaStyle.stroke, lineWidth: 1) }
-        .contentShape(RoundedRectangle(cornerRadius: 14))
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
     }
 
     private var options: some View {
@@ -312,7 +310,6 @@ struct ReaderView: View {
                     Button("Paste or replace lyrics") { manualAfterOptions = true; showsOptions = false }
                 }
             }
-            .scrollContentBackground(.hidden).background(LyricaStyle.paper)
             .navigationTitle("Reader options").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showsOptions = false } } }
         }.presentationDetents([.medium, .large])
@@ -346,10 +343,9 @@ struct ManualLyricsView: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 16) {
-                NoticeView(title: "Bring your own words", message: "Paste lyrics you’re permitted to use. Keep a line break between each lyric and a blank line between verses.")
+                NoticeView(title: "Paste original lyrics", message: "Paste lyrics you’re permitted to use. Keep a line break between each lyric and a blank line between verses.")
                 TextEditor(text: $text).font(.body).scrollContentBackground(.hidden).padding(10)
-                    .background(LyricaStyle.surface, in: RoundedRectangle(cornerRadius: 16))
-                    .overlay { RoundedRectangle(cornerRadius: 16).strokeBorder(LyricaStyle.stroke, lineWidth: 1) }
+                    .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 8))
                     .accessibilityLabel("Original lyrics")
                 Text("Only metadata is saved unless you enable permitted offline caching.").font(.footnote).foregroundStyle(.secondary)
             }.padding(20).background(LyricaStyle.paper)

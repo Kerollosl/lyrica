@@ -35,7 +35,7 @@ struct LibraryView: View {
                     .listRowSeparator(.hidden)
             } else if favoritesOnly {
                 Section {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: dynamicType.isAccessibilitySize ? 260 : 148), spacing: 18)], alignment: .leading, spacing: 24) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: dynamicType.isAccessibilitySize ? 260 : 148), spacing: 16)], alignment: .leading, spacing: 16) {
                         ForEach(filtered) { record in
                             NavigationLink { ReaderView(song: record.song) } label: {
                                 favoriteCard(record)
@@ -48,7 +48,7 @@ struct LibraryView: View {
                     }
                     .padding(.vertical, 8)
                 } header: {
-                    sectionHeader("Your favorites", count: filtered.count)
+                    sectionHeader("Favorites", count: filtered.count)
                 } footer: {
                     offlineExplanation
                 }
@@ -64,7 +64,7 @@ struct LibraryView: View {
                             Button("Remove", role: .destructive) { remove(record) }
                         }
                     }
-                    .listRowBackground(LyricaStyle.surface)
+                    .listRowBackground(Color(uiColor: .secondarySystemGroupedBackground))
                 } header: {
                     sectionHeader("Recently viewed", count: filtered.count)
                 } footer: {
@@ -74,7 +74,7 @@ struct LibraryView: View {
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
-        .background(LyricaStyle.paper)
+        .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("Library")
         .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Title, artist, or album")
         .alert("Storage issue", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
@@ -86,42 +86,37 @@ struct LibraryView: View {
 
     private var emptyState: some View {
         ContentUnavailableView {
-            Label(query.isEmpty ? (favoritesOnly ? "Keep your favorites close" : "Your listening, understood") : "No matching songs", systemImage: query.isEmpty ? (favoritesOnly ? "heart" : "clock") : "magnifyingglass")
+            Label(query.isEmpty ? (favoritesOnly ? "No favorites" : "No recently viewed songs") : "No matching songs", systemImage: query.isEmpty ? (favoritesOnly ? "heart" : "clock") : "magnifyingglass")
         } description: {
-            Text(query.isEmpty ? (favoritesOnly ? "Tap the heart on any song to collect it here." : "Songs you open appear here, ready to revisit.") : "Try a different title, artist, or album.")
+            Text(query.isEmpty ? (favoritesOnly ? "Tap the heart in a song to add it to Favorites." : "Songs you open will appear here.") : "Try a different title, artist, or album.")
         }
         .padding(.vertical, 28)
     }
 
     private func sectionHeader(_ title: String, count: Int) -> some View {
         HStack {
-            Text(title).textCase(nil).font(.subheadline.weight(.semibold)).foregroundStyle(LyricaStyle.ink)
+            Text(title)
             Spacer()
-            Text("\(count)").font(.caption.monospacedDigit()).foregroundStyle(LyricaStyle.secondary)
+            Text("\(count)").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
         }
-        .padding(.bottom, 6)
     }
 
     private func favoriteCard(_ record: StoredSong) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             GeometryReader { geometry in
                 ArtworkView(url: record.song.artworkURL, size: geometry.size.width)
             }
             .aspectRatio(1, contentMode: .fit)
-            .overlay(alignment: .bottomLeading) {
-                if record.document != nil {
-                    SavedBadge().padding(10)
-                }
-            }
             VStack(alignment: .leading, spacing: 3) {
                 Text(record.title)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(LyricaStyle.ink)
+                    .foregroundStyle(.primary)
                     .lineLimit(dynamicType.isAccessibilitySize ? nil : 2)
                 Text(record.artist)
                     .font(.caption)
-                    .foregroundStyle(LyricaStyle.secondary)
+                    .foregroundStyle(.secondary)
                     .lineLimit(dynamicType.isAccessibilitySize ? nil : 1)
+                if record.document != nil { SavedBadge() }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -133,9 +128,9 @@ struct LibraryView: View {
     private var offlineExplanation: some View {
         Text("Saved badges mark lyrics available on this iPhone. Languages you’ve already translated are available offline too.")
             .font(.footnote)
-            .foregroundStyle(LyricaStyle.secondary)
+            .foregroundStyle(.secondary)
             .textCase(nil)
-            .padding(.top, 12)
+            .padding(.top, 4)
     }
 
     private func remove(_ record: StoredSong) {

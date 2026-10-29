@@ -4,11 +4,11 @@ import LyricaCore
 /// Shared semantic surfaces keep the reader and library consistent in both appearances.
 enum LyricaStyle {
     static let accent = Color("AccentColor")
-    static let paper = Color("Paper")
-    static let surface = Color("Surface")
-    static let ink = Color("Ink")
-    static let secondary = Color("SecondaryInk")
-    static let stroke = Color("Stroke")
+    static let paper = Color(uiColor: .systemBackground)
+    static let surface = Color(uiColor: .secondarySystemGroupedBackground)
+    static let ink = Color.primary
+    static let secondary = Color.secondary
+    static let stroke = Color(uiColor: .separator)
     static let accentInk = Color("AccentInk")
 }
 
@@ -22,19 +22,15 @@ struct ArtworkView: View {
                 image.resizable().scaledToFill()
             } else {
                 ZStack {
-                    LyricaStyle.accent.opacity(0.09)
+                    Color(uiColor: .secondarySystemFill)
                     Image(systemName: "music.note")
-                        .font(.system(size: size * 0.28, weight: .medium))
-                        .foregroundStyle(LyricaStyle.accent)
+                        .font(.system(size: size * 0.28))
+                        .foregroundStyle(.secondary)
                 }
             }
         }
         .frame(width: size, height: size)
-        .clipShape(RoundedRectangle(cornerRadius: min(size * 0.16, 18)))
-        .overlay {
-            RoundedRectangle(cornerRadius: min(size * 0.16, 18))
-                .strokeBorder(LyricaStyle.ink.opacity(0.04), lineWidth: 1)
-        }
+        .clipShape(RoundedRectangle(cornerRadius: 8))
         .accessibilityHidden(true)
     }
 }
@@ -48,7 +44,7 @@ struct SongRow: View {
         HStack(spacing: 14) {
             ArtworkView(url: song.artworkURL, size: dynamicType.isAccessibilitySize ? 64 : 58)
             VStack(alignment: .leading, spacing: 5) {
-                Text(song.title).font(.body.weight(.semibold)).foregroundStyle(LyricaStyle.ink)
+                Text(song.title).font(.body).foregroundStyle(LyricaStyle.ink)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(song.artist).font(.subheadline).foregroundStyle(LyricaStyle.secondary)
                 Text(song.album).font(.caption).foregroundStyle(LyricaStyle.secondary).lineLimit(2)
@@ -66,7 +62,7 @@ struct SongRow: View {
                 }
             }
         }
-        .padding(.vertical, 8)
+        .padding(.vertical, 4)
         .frame(minHeight: 60)
         .accessibilityElement(children: .combine)
     }
@@ -75,10 +71,8 @@ struct SongRow: View {
 struct SavedBadge: View {
     var body: some View {
         Label("Saved offline", systemImage: "arrow.down.circle.fill")
-            .font(.caption2.weight(.medium))
-            .foregroundStyle(LyricaStyle.accent)
-            .padding(.horizontal, 8).padding(.vertical, 5)
-            .background(LyricaStyle.surface, in: Capsule())
+            .font(.caption2)
+            .foregroundStyle(.secondary)
             .accessibilityLabel("Lyrics saved offline")
     }
 }
@@ -89,7 +83,7 @@ struct SectionHeading: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text(title).font(.title3.weight(.bold)).foregroundStyle(LyricaStyle.ink)
+            Text(title).font(.headline).foregroundStyle(LyricaStyle.ink)
             if let subtitle { Text(subtitle).font(.subheadline).foregroundStyle(LyricaStyle.secondary) }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -104,7 +98,7 @@ struct NoticeView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: symbol).font(.body.weight(.medium)).foregroundStyle(LyricaStyle.accent)
+            Image(systemName: symbol).font(.body).foregroundStyle(.secondary)
                 .frame(width: 22).padding(.top, 1).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 6) {
                 Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(LyricaStyle.ink)
@@ -112,21 +106,8 @@ struct NoticeView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(16)
+        .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(LyricaStyle.surface, in: RoundedRectangle(cornerRadius: 18))
-        .overlay { RoundedRectangle(cornerRadius: 18).strokeBorder(LyricaStyle.stroke, lineWidth: 1) }
-    }
-}
-
-struct LyricaPrimaryButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(LyricaStyle.accentInk)
-            .frame(minHeight: 44)
-            .padding(.horizontal, 20)
-            .background(LyricaStyle.accent.opacity(configuration.isPressed ? 0.8 : 1), in: Capsule())
     }
 }
 
@@ -142,11 +123,10 @@ struct SongLoadingRows: View {
                     }
                     Spacer()
                 }
-                .padding(14)
+                .padding(.vertical, 10)
                 if index < 4 { Divider().padding(.leading, 86) }
             }
         }
-        .background(LyricaStyle.surface, in: RoundedRectangle(cornerRadius: 20))
         .accessibilityHidden(true)
     }
 }
