@@ -47,6 +47,10 @@ jobs:
             -parallel-testing-enabled NO \
             CODE_SIGNING_ALLOWED=NO
       - name: Capture running search screen
+        # Simulator exports are useful review artifacts, not build/test gates.
+        # A stuck CoreSimulator must not consume the full validation timeout.
+        timeout-minutes: 3
+        continue-on-error: true
         run: |
           xcrun simctl bootstatus "$LYRICA_SIMULATOR_ID" -b
           xcrun simctl install "$LYRICA_SIMULATOR_ID" build/Build/Products/Debug-iphonesimulator/Lyrica.app
