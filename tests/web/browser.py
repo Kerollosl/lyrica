@@ -336,6 +336,9 @@ def test_compact_layout_and_forced_colors(browser):
     expect(line).to_have_attribute("aria-pressed", "true")
     edge = line.evaluate("el => ({width: parseFloat(getComputedStyle(el).outlineWidth), style: getComputedStyle(el).outlineStyle})")
     assert edge["width"] > 0 and edge["style"] != "none", f"Selected lyric is invisible in forced colors: {edge}"
+    # Reader retains the Search hash; reselecting the tab must still leave it.
+    navigate(page, "search")
+    open_demo(page)
     navigate(page, "library")
     selected = page.get_by_role("button", name="Favorites", exact=True)
     selected.click()

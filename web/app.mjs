@@ -431,6 +431,23 @@ async function navigate() {
 window.addEventListener("hashchange", () =>
   navigate().catch((error) => toast(error.message)),
 );
+// Opening a reader keeps its originating tab's hash. Reselecting that tab
+// should return to its root even though the browser emits no hashchange.
+document.querySelectorAll("a[data-nav], a.brand").forEach((link) => {
+  link.addEventListener("click", (event) => {
+    if (
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.shiftKey &&
+      !event.altKey &&
+      event.button === 0 &&
+      location.hash === link.hash
+    ) {
+      event.preventDefault();
+      navigate().catch((error) => toast(error.message));
+    }
+  });
+});
 document.addEventListener("submit", (event) => {
   if (event.target.id === "search-form") {
     event.preventDefault();

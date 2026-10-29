@@ -1,5 +1,6 @@
 """Shared deterministic Playwright support for the static Lyrica companion."""
 from pathlib import Path
+from playwright.sync_api import expect
 import os
 import shutil
 
@@ -25,8 +26,13 @@ def visit(page, path=""):
 
 
 def navigate(page, destination):
-    page.locator(f'[data-nav="{destination}"]').click()
-    page.locator("main h1").wait_for()
+    link = page.locator(f'[data-nav="{destination}"]')
+    link.click()
+    # Hash navigation refreshes IndexedDB before rendering. Waiting for any h1
+    # can observe the page we are leaving and send keys to a stale screen.
+    expect(link).to_have_attribute("aria-current", "page")
+    heading = {"search": "Search songs", "library": "Library", "settings": "Settings"}[destination]
+    expect(page.get_by_role("heading", name=heading, exact=True)).to_be_visible()
 
 
 def reader_options(page):
