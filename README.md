@@ -34,7 +34,7 @@ The web and iOS apps use system fonts, neutral light/dark backgrounds, blue cont
 
 The older illustrated concepts in `docs/previews/` are historical design studies. The screenshots above are captured from the current running app; original demo lyrics are labeled, and no screenshot demonstrates a model download.
 
-These iPhone Search screens are captured from the running iOS simulator in light and dark appearance:
+These light/dark iPhone Search captures are from an earlier successful simulator run. The latest native builds and tests pass, but the optional screenshot export timed out before producing fresh images:
 
 <p><img src="docs/ios/search-light.png" width="26%" alt="Lyrica iPhone Search in light mode" /> <img src="docs/ios/search-dark.png" width="26%" alt="Lyrica iPhone Search in dark mode" /></p>
 
