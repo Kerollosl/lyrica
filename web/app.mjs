@@ -14,6 +14,7 @@ import {
   detectLanguage,
   translationStatus,
   translateLines,
+  clearTranslationModels,
 } from "./translation.mjs";
 const main = document.querySelector("main");
 const dialog = document.querySelector("dialog");
@@ -38,6 +39,7 @@ const state = {
   lines: [],
   message: "",
   translating: false,
+  modelDownload: false,
   selected: -1,
   stacked: false,
 };
@@ -215,14 +217,14 @@ function translationNotice() {
   if (state.reader?.loading)
     return '<div class="notice"><span class="spinner"></span>Finding lyrics…</div>';
   if (!state.message) return "";
-  return `<div class="notice status-inline">${state.translating ? '<span class="spinner"></span>' : ""}${e(state.message)}${!state.translating && state.reader?.document && !state.lines.length ? '<button class="plain" data-action="translate">Translate on this device</button><button class="plain" data-action="manual-translation">Paste translation</button>' : ""}${!state.reader?.document ? '<button class="plain" data-action="retry-lyrics">Retry</button><button class="plain" data-action="manual-original">Paste lyrics</button>' : ""}</div>`;
+  return `<div class="notice status-inline">${state.translating ? '<span class="spinner"></span>' : ""}${e(state.message)}${state.translating ? '<button class="plain" data-action="cancel-translation">Cancel</button>' : ""}${!state.translating && state.reader?.document && !state.lines.length ? `<button class="plain" data-action="translate">${state.modelDownload ? "Download & translate" : "Translate on this device"}</button><button class="plain" data-action="manual-translation">Paste translation</button>` : ""}${!state.reader?.document ? '<button class="plain" data-action="retry-lyrics">Retry</button><button class="plain" data-action="manual-original">Paste lyrics</button>' : ""}</div>`;
 }
 function settingsView() {
   return `<header class="page-head"><h1 class="page-title">Settings</h1></header><div class="settings-grid">
   <section class="setting-section"><h2>${icon("text")} Reading</h2><div class="setting-row"><label for="default-language">Default translation language</label><select id="default-language">${options(state.settings.target)}</select></div><div class="setting-row"><label for="font-size">Lyrics text size <small id="font-value">${state.settings.font}px</small></label><input id="font-size" type="range" min="15" max="30" value="${state.settings.font}"></div></section>
   <section class="setting-section"><h2>${icon("settings")} Appearance</h2><div class="setting-row"><label for="theme">Color theme<small>Follow your device, or choose your own.</small></label><select id="theme">${["system", "light", "dark"].map((value) => `<option value="${value}" ${value === state.settings.theme ? "selected" : ""}>${value[0].toUpperCase() + value.slice(1)}</option>`).join("")}</select></div></section>
-  <section class="setting-section"><h2>${icon("download")} Storage</h2><label class="setting-row cache-setting" for="cache"><span>Save permitted lyrics offline<small>Only save lyrics and translations you’re permitted to keep.</small></span><span class="switch-target"><input id="cache" type="checkbox" ${state.settings.cache ? "checked" : ""}></span></label><p>${state.songs.filter((song) => song.document).length} originals saved · ${state.songs.filter((song) => song.favorite).length} favorites. Stored on this browser, separate from your iPhone library.</p><div class="storage-buttons"><button class="plain" data-action="clear-cache">Clear lyrics & translations</button><button class="plain" data-action="clear-recent">Clear recent searches</button><button class="plain danger" data-action="delete-all">Delete library & history</button></div></section>
-  <details class="setting-section about-details"><summary>About Lyrica & privacy</summary><div class="about-content"><p>Search and metadata come from Apple’s iTunes API. Lyrics come from LRCLIB. Availability does not grant copyright or redistribution rights. Only paste or store material you’re authorized to use.</p><p>Automatic web translation uses the browser’s on-device Translator API where available (supported desktop Chrome versions, compatible hardware and language pairs). It may need a free model download and a manual source-language selection. Safari, Firefox, and many mobile browsers don’t provide this API; paste translations or explore the original bilingual demo there. Apple Translation is exclusive to the native iPhone app.</p><p>Queries go directly to Apple, and recording metadata goes directly to LRCLIB. Lyrica has no analytics, accounts, server, paid API, or cloud sync. Only the application shell is cached automatically; lyric storage is opt-in. Clearing browser data removes your library. Browser-managed translation models are managed by the browser.</p><a class="plain" href="https://github.com/Kerollosl/lyrica" target="_blank" rel="noopener">Explore the iPhone app and source ${icon("external")}</a></div></details></div>`;
+  <section class="setting-section"><h2>${icon("download")} Storage</h2><label class="setting-row cache-setting" for="cache"><span>Save permitted lyrics offline<small>Only save lyrics and translations you’re permitted to keep.</small></span><span class="switch-target"><input id="cache" type="checkbox" ${state.settings.cache ? "checked" : ""}></span></label><p>${state.songs.filter((song) => song.document).length} originals saved · ${state.songs.filter((song) => song.favorite).length} favorites. Stored on this browser, separate from your iPhone library.</p><div class="storage-buttons"><button class="plain" data-action="clear-models">Remove downloaded language models</button><button class="plain" data-action="clear-cache">Clear lyrics & translations</button><button class="plain" data-action="clear-recent">Clear recent searches</button><button class="plain danger" data-action="delete-all">Delete library & history</button></div></section>
+  <details class="setting-section about-details"><summary>About Lyrica & privacy</summary><div class="about-content"><p>Search and metadata come from Apple’s iTunes API. Lyrics come from LRCLIB. Availability does not grant copyright or redistribution rights. Only paste or store material you’re authorized to use.</p><p>Spanish, Arabic, and French → English can run privately in your browser using downloadable OPUS-MT models. Choose the original language, then download its model when prompted (about 110–120 MB per language, plus a shared 23 MB engine). Translation appears line by line. Speed and memory use depend on your phone. Models are reused while browser storage is retained; you can remove them below. Supported desktop browsers may use their built-in translator instead. Apple Translation is exclusive to the native iPhone app.</p><p>Queries go directly to Apple, and recording metadata goes directly to LRCLIB. Language models download from Hugging Face; your lyric text is processed locally and is not sent there. Lyrica has no analytics, accounts, server, paid API, or cloud sync. Only the application shell is cached automatically; lyric storage is opt-in. Clearing browser data removes your library. Browser-managed translation models are managed by the browser.</p><a class="plain" href="https://github.com/Kerollosl/lyrica" target="_blank" rel="noopener">Explore the iPhone app and source ${icon("external")}</a></div></details></div>`;
 }
 async function search() {
   searchController?.abort();
@@ -340,6 +342,7 @@ async function prepare(userGesture = false) {
   const token = ++revision;
   state.lines = [];
   state.translating = false;
+  state.modelDownload = false;
   state.message = "";
   const reader = state.reader;
   if (!reader?.document) return;
@@ -358,7 +361,9 @@ async function prepare(userGesture = false) {
       state.lines = reader.translations[key];
       state.message = reader.song.demo
         ? ""
-        : "Saved translation · Available offline.";
+        : state.settings.cache
+          ? "Saved translation · Available offline."
+          : "Translation from this session.";
       render();
       return;
     }
@@ -375,8 +380,16 @@ async function prepare(userGesture = false) {
         "Choose the original language above to translate on this device.";
     else if (status === "unavailable")
       state.message =
-        "This language pair isn’t supported on this device. Choose another language or paste a translation.";
-    else if (status !== "available" && !userGesture)
+        "Automatic mobile translation supports Spanish, Arabic, and French → English. Choose one of these pairs, or paste a translation.";
+    else if (status === "model-download" && !userGesture) {
+      state.modelDownload = true;
+      state.message =
+        "Download this language to translate privately on your phone. About 110–120 MB, plus a shared 23 MB engine. Free; lyrics stay on your device. Downloaded models are reused while browser storage is retained.";
+    } else if (
+      status !== "available" &&
+      status !== "model-ready" &&
+      !userGesture
+    )
       state.message =
         "A free language-model download is needed. Select “Translate on this device” to begin.";
     else {
@@ -389,6 +402,15 @@ async function prepare(userGesture = false) {
         state.target,
         {
           signal: controller.signal,
+          engine: status.startsWith("model-") ? "model" : "native",
+          onLine(index, text) {
+            if (token !== revision) return;
+            state.lines[index] = text;
+            const cell = document.querySelector(
+              `.lyric-row[data-index="${index}"] .translated`,
+            );
+            if (cell) cell.textContent = text || "—";
+          },
           progress(message) {
             if (token === revision) {
               state.message = message;
@@ -406,6 +428,7 @@ async function prepare(userGesture = false) {
     }
   } catch (error) {
     if (token !== revision || controller.signal.aborted) return;
+    state.lines = [];
     state.message = `Translation couldn’t finish. ${error.message} Try again or paste a translation.`;
   } finally {
     if (token === revision) {
@@ -666,6 +689,14 @@ document.addEventListener("click", async (event) => {
     }
     if (action === "retry-search") await search();
     if (action === "retry-lyrics") await loadLyrics();
+    if (action === "cancel-translation") {
+      translationController?.abort();
+      revision++;
+      state.translating = false;
+      state.lines = [];
+      state.message = "Translation stopped. You can retry when you’re ready.";
+      render();
+    }
     if (action === "translate") await prepare(true);
     if (action === "favorites" || action === "history") {
       state.favorites = action === "favorites";
@@ -729,6 +760,17 @@ document.addEventListener("click", async (event) => {
       render();
       toast("Recent searches cleared");
     }
+    if (action === "clear-models")
+      showDialog(
+        "Remove downloaded models?",
+        "Language models and the shared engine will be removed from this browser. Saved translations stay in your library. A new download is needed to translate more songs.",
+        "Remove models",
+        async () => {
+          await clearTranslationModels();
+          toast("Downloaded models removed.");
+        },
+        { confirmLabel: "Remove models" },
+      );
     if (action === "clear-cache" || action === "delete-all")
       showDialog(
         action === "clear-cache"

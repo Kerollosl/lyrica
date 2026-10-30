@@ -1,4 +1,4 @@
-const CACHE = "lyrica-shell-v4";
+const CACHE = "lyrica-shell-v5";
 const SHELL = [
   "./",
   "./index.html",
@@ -9,6 +9,8 @@ const SHELL = [
   "./services.mjs",
   "./store.mjs",
   "./translation.mjs",
+  "./translation-models.mjs",
+  "./translation-worker.mjs",
   "./icon.png",
   "./manifest.webmanifest",
 ];
@@ -36,7 +38,26 @@ self.addEventListener("fetch", (event) => {
     new URL(event.request.url).origin !== self.location.origin
   )
     return;
-  // Only the static application shell is cached. API responses never enter this cache.
+  // Cache the large runtime only after a translation download is explicitly requested.
+  if (new URL(event.request.url).pathname.includes("/vendor/transformers/")) {
+    event.respondWith(
+      caches.open("lyrica-translation-runtime-v1").then(async (cache) => {
+        const saved = await cache.match(event.request);
+        if (saved) return saved;
+        const response = await fetch(event.request);
+        if (response.ok) {
+          try {
+            await cache.put(event.request, response.clone());
+          } catch {
+            /* Optional storage. */
+          }
+        }
+        return response;
+      }),
+    );
+    return;
+  }
+  // Only static assets are cached here. Lyrics and metadata never enter this cache.
   const allowed = SHELL.map(
     (path) => new URL(path, self.registration.scope).href,
   );

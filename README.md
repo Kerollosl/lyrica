@@ -16,7 +16,7 @@ The browser companion is included in [`web/`](web/README.md), committed directly
 python3 -m http.server 4173 --directory web
 ```
 
-Open **http://localhost:4173**. Search real songs or choose **Open example** to test immediately. Web translation uses the browser’s on-device Translator API in supported desktop Chrome environments; Apple Translation is exclusive to iOS. Other browsers support pasted translations and the included original demo. Both versions use free services and opt-in local lyric storage.
+Open **http://localhost:4173**. Search real songs or choose **Open example** to test immediately. Web translation supports **Spanish, Arabic, and French → English** through optional downloadable on-device models, including a WebAssembly fallback for browsers without the Translator API. Models need approximately 110–120 MB per language plus a shared 23 MB engine. Actual iPhone browser performance still needs device testing; Apple Translation is exclusive to the native app. See [web translation details](docs/WEB_TRANSLATION.md). Both versions use free services and opt-in local lyric storage.
 
 These are real screenshots from the browser implementation:
 

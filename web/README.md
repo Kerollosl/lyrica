@@ -18,9 +18,15 @@ For real music, search by song/artist/album or paste an Apple Music song URL. Se
 
 ## Translation differences from iOS
 
-Apple Translation cannot run in a website. This version uses the browser's built-in **Translator API** where supported, currently compatible desktop Chrome versions/hardware and supported language pairs. The **LanguageDetector API** detects source language when its model is already available; otherwise choose the source manually. Language availability varies. Free model downloads may require a button click and browser consent. An internet connection and free disk space are needed for initial model downloads.
+The web app automatically translates **Spanish → English, Arabic → English, and French → English** on device. It prefers a previously downloaded local model; otherwise it uses the browser's built-in Translator API if the pair is supported. Safari and other browsers without that API use quantized OPUS-MT models in a dedicated WebAssembly worker. Apple Translation remains exclusive to the native app.
 
-Safari, Firefox, most mobile browsers, and unsupported Chrome configurations can still search, retrieve lyrics, read original lyrics, and use **Paste a translation** to create a bilingual view. The included demo has English, French, Arabic, Italian, and Portuguese example translations. The web app never silently uses a cloud translator or paid API. Browser-native model downloads and quality remain device checks; automated tests do not prove real model availability.
+Choose the original language if automatic browser language detection is unavailable. On the first use of a language, select **Download & translate** after reviewing the download size. Each language needs approximately 110–120 MB of model/tokenizer files, plus a shared 23 MB runtime. Only the requested language is downloaded. Models are fetched from Hugging Face at pinned revisions; lyric text never leaves the device for translation. The engine is vendored with its notices, so runtime code is not imported from a third-party CDN.
+
+Rows appear progressively. Blank verses and row indices remain aligned; repeated lines reuse a result. Long rows are split for inference and rejoined into their original row. Cancellation terminates the worker, including an active model download. Only one language model is retained in memory. Changing languages releases the old worker.
+
+Browser storage reuses downloaded models and the runtime; after a successful download they can work offline while storage is retained. Browser eviction, private mode, quota, and device memory limits can affect this. **Remove downloaded language models** in Settings removes both models and the shared runtime, keeping permitted saved translations. Lyric storage remains separately opt-in. Other language pairs can still use supported browser translation or pasted translations.
+
+This is automatic, progressive translation rather than a guarantee of instant completion. Real OPUS-MT inference, model caching, offline reload, and deletion were verified in Linux Chromium with a phone-size viewport. **Actual iPhone Safari performance, memory limits, and embedded ChatGPT browser behavior remain unverified.** If an embedded browser cannot run the worker, open the Site directly in Safari. See [model details and verification](../docs/WEB_TRANSLATION.md).
 
 Manual translations require one translated line per nonblank original line. Verse breaks are restored automatically. Changing original lyrics invalidates previous translations. Cached languages switch immediately without contacting a translation service.
 
@@ -36,6 +42,9 @@ The web and iOS libraries are separate. There is no authentication or cloud sync
 node --test tests/web/*.test.mjs
 # With the local server running and Playwright + Chromium installed:
 python3 tests/web/browser.py
+python3 tests/web/translation-browser.py
+# Optional real-model integration check (downloads approximately 350 MB):
+python3 tests/web/models.py
 ```
 
 Domain tests cover URL validation, recording matching/ambiguity, timestamps, line alignment, escaping, opt-in storage, and demo consistency. Browser tests mock external API responses to deterministically exercise search, retrieval, manual translation, highlights, RTL, cached language switching, favorites, persistence, deletion of cached content, dark mode, and mobile overflow. Real iTunes and LRCLIB endpoints were separately checked for CORS support. Real model downloads are not simulated as proof of translation availability.
