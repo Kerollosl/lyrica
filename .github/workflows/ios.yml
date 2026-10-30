@@ -53,7 +53,8 @@ jobs:
         continue-on-error: true
         run: |
           xcrun simctl bootstatus "$LYRICA_SIMULATOR_ID" -b
-          xcrun simctl install "$LYRICA_SIMULATOR_ID" build/Build/Products/Debug-iphonesimulator/Lyrica.app
+          # Lyrica is the unit-test host, so xcodebuild test has already installed it.
+          # Reinstalling the same bundle can stall CoreSimulator after XCTest exits.
           xcrun simctl launch "$LYRICA_SIMULATOR_ID" com.kerollosl.lyrica
           xcrun simctl ui "$LYRICA_SIMULATOR_ID" appearance light
           sleep 3
