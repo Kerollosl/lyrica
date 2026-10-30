@@ -67,14 +67,10 @@ struct SearchView: View {
     @ViewBuilder
     private var discovery: some View {
         Section {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Search songs").font(.title2.weight(.semibold))
-                Text("Search by title, artist, or album.")
-                    .font(.subheadline).foregroundStyle(.secondary)
-            }
-            .padding(.vertical, 4)
-        } footer: {
-            Text("You can also paste an Apple Music song link.")
+            Text("Find lyrics by song, artist, or album. You can also paste an Apple Music song link.")
+                .font(.subheadline).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.vertical, 4)
         }
         .listRowBackground(Color.clear)
 

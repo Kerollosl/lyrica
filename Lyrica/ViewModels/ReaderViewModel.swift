@@ -14,8 +14,12 @@ struct TranslationRequest: Identifiable {
 final class ReaderViewModel {
     let song: Song
     private(set) var document: LyricDocument? = nil {
-        didSet { detectedLanguage = document.flatMap { LanguageCatalog.detect($0.text) } }
+        didSet {
+            detectedLanguage = document.flatMap { LanguageCatalog.detect($0.text) }
+            presentation.replaceOriginal(with: document?.text)
+        }
     }
+    private(set) var presentation = ReaderPresentation()
     private(set) var detectedLanguage: String?
     private(set) var translated: [String] = []
     private(set) var isLoading = false
@@ -40,6 +44,8 @@ final class ReaderViewModel {
     var sourceLanguage: String? {
         sourceOverride == "auto" ? detectedLanguage : sourceOverride
     }
+
+    func toggleLine(_ id: UUID) { presentation.toggleLine(id) }
 
     func load(store: LibraryStore, settings: AppSettings) async {
         guard document == nil, !isLoading else { return }

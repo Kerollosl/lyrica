@@ -8,6 +8,7 @@ struct LibraryView: View {
     @State private var query = ""
     @State private var favoritesOnly = true
     @State private var error: String?
+    @State private var pendingRemoval: StoredSong?
 
     private var filtered: [StoredSong] {
         let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -42,7 +43,7 @@ struct LibraryView: View {
                             }
                             .buttonStyle(.plain)
                             .contextMenu {
-                                Button("Remove from library", systemImage: "trash", role: .destructive) { remove(record) }
+                                Button("Remove from library", systemImage: "trash", role: .destructive) { pendingRemoval = record }
                             }
                         }
                     }
@@ -60,8 +61,8 @@ struct LibraryView: View {
                         NavigationLink { ReaderView(song: record.song) } label: {
                             SongRow(song: record.song, offline: record.document != nil)
                         }
-                        .swipeActions(edge: .trailing) {
-                            Button("Remove", role: .destructive) { remove(record) }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button("Remove", role: .destructive) { pendingRemoval = record }
                         }
                     }
                     .listRowBackground(Color(uiColor: .secondarySystemGroupedBackground))
@@ -77,6 +78,15 @@ struct LibraryView: View {
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("Library")
         .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Title, artist, or album")
+        .confirmationDialog("Remove this song?", isPresented: Binding(get: { pendingRemoval != nil }, set: { if !$0 { pendingRemoval = nil } }), titleVisibility: .visible) {
+            Button("Remove song", role: .destructive) {
+                if let record = pendingRemoval { remove(record) }
+                pendingRemoval = nil
+            }
+            Button("Cancel", role: .cancel) { pendingRemoval = nil }
+        } message: {
+            Text("Removes this song, its saved lyrics, and its translations from this iPhone.")
+        }
         .alert("Storage issue", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
             Button("OK") { error = nil }
         } message: {

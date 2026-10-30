@@ -10,7 +10,6 @@ struct ReaderView: View {
     @Environment(\.dynamicTypeSize) private var dynamicType
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var model: ReaderViewModel
-    @State private var selectedLine: Int?
     @State private var showsManual = false
     @State private var showsOptions = false
     @State private var manualAfterOptions = false
@@ -55,6 +54,7 @@ struct ReaderView: View {
                         .frame(minWidth: 44, minHeight: 44)
                 }
                 .accessibilityLabel(model.isFavorite ? "Remove from favorites" : "Save to favorites")
+                .accessibilityValue(model.isFavorite ? "Saved" : "Not saved")
                 Button { showsOptions = true } label: {
                     Image(systemName: "slider.horizontal.3").frame(minWidth: 44, minHeight: 44)
                 }
@@ -127,9 +127,8 @@ struct ReaderView: View {
             if model.isTranslating {
                 ProgressView().tint(LyricaStyle.accent).frame(maxWidth: .infinity).padding(.bottom, 16)
             }
-            columnHeader(stacked: stacked).padding(.horizontal, 10).padding(.bottom, 8)
-            ForEach(Array(document.lines.enumerated()), id: \.offset) { index, line in
-                lyricRow(index: index, original: line, stacked: stacked)
+            ForEach(model.presentation.lines) { line in
+                lyricRow(line: line, stacked: stacked)
             }
             VStack(alignment: .leading, spacing: 12) {
                 Divider().padding(.bottom, 8)
@@ -173,24 +172,16 @@ struct ReaderView: View {
         .accessibilityElement(children: .combine)
     }
 
-    private func columnHeader(stacked: Bool) -> some View {
-        HStack(spacing: 24) {
-            Text(stacked ? "Original & translation" : "Original")
-                .frame(maxWidth: .infinity, alignment: .leading)
-            if !stacked { Text("Translation").frame(maxWidth: .infinity, alignment: .leading) }
-        }
-        .font(.caption.weight(.semibold)).foregroundStyle(LyricaStyle.secondary)
-        .environment(\.layoutDirection, .leftToRight)
-        .accessibilityAddTraits(.isHeader)
-    }
-
-    private func lyricRow(index: Int, original: String, stacked: Bool) -> some View {
+    private func lyricRow(line: ReaderLine, stacked: Bool) -> some View {
+        let index = line.index
+        let original = line.text
+        let selected = model.presentation.selectedLineID == line.id
         let translation = model.translated.indices.contains(index) ? model.translated[index] : nil
         return Group {
             if original.isEmpty { Color.clear.frame(height: 24).accessibilityHidden(true) }
             else {
                 Button {
-                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) { selectedLine = selectedLine == index ? nil : index }
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) { model.toggleLine(line.id) }
                 } label: {
                     Group {
                         if stacked {
@@ -208,13 +199,13 @@ struct ReaderView: View {
                     }
                     .padding(.vertical, 10).padding(.horizontal, 10)
                     .frame(minHeight: 44)
-                    .background(selectedLine == index ? LyricaStyle.accent.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: 6))
+                    .background(selected ? LyricaStyle.accent.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: 6))
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(original + ". " + (translation ?? "Translation pending"))
                 .accessibilityHint("Highlights the original and translation")
-                .accessibilityAddTraits(selectedLine == index ? .isSelected : [])
+                .accessibilityAddTraits(selected ? .isSelected : [])
             }
         }
     }
@@ -237,16 +228,14 @@ struct ReaderView: View {
             if dynamicType.isAccessibilitySize {
                 VStack(spacing: 8) { sourceLanguageMenu; targetLanguageMenu }
             } else {
-                HStack(spacing: 12) {
+                HStack(alignment: .top, spacing: 24) {
                     sourceLanguageMenu
-                    Image(systemName: "arrow.right").font(.caption.weight(.semibold))
-                        .foregroundStyle(LyricaStyle.secondary).accessibilityHidden(true)
                     targetLanguageMenu
                 }
                 .environment(\.layoutDirection, .leftToRight)
             }
         }
-        .padding(.horizontal, 20).padding(.vertical, 10)
+        .padding(.horizontal, 26).padding(.vertical, 10)
         .background(LyricaStyle.paper)
         .overlay(alignment: .bottom) { Rectangle().fill(LyricaStyle.stroke).frame(height: 1) }
     }
@@ -270,7 +259,7 @@ struct ReaderView: View {
                 ForEach(languages.including(model.targetLanguage)) { Text($0.name).tag($0.id) }
             }
         } label: {
-            languageControl(title: "Translate to", language: ReaderLanguage(id: model.targetLanguage).name)
+            languageControl(title: "Translation", language: ReaderLanguage(id: model.targetLanguage).name)
         }
         .accessibilityLabel("Translation language, \(ReaderLanguage(id: model.targetLanguage).name)")
     }
@@ -297,7 +286,9 @@ struct ReaderView: View {
                 Section("Reading") {
                     Picker("Layout", selection: $layout) { ForEach(ReaderLayout.allCases) { Text($0.title).tag($0) } }
                     LabeledContent("Text size", value: "\(Int(settings.fontSize)) pt")
-                    Slider(value: $settings.fontSize, in: 14...30, step: 1).accessibilityLabel("Lyrics text size")
+                    Slider(value: $settings.fontSize, in: 14...30, step: 1)
+                        .accessibilityLabel("Lyrics text size")
+                        .accessibilityValue("\(Int(settings.fontSize)) points")
                 }
                 Section("Original language") {
                     Picker("Language", selection: $model.sourceOverride) {
@@ -338,21 +329,55 @@ private struct TranslationWorker: View {
 struct ManualLyricsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var text: String
+    @State private var confirmsDiscard = false
+    @FocusState private var isEditing: Bool
+    private let initialText: String
     let save: (String) -> Void
-    init(initialText: String, save: @escaping (String) -> Void) { _text = State(initialValue: initialText); self.save = save }
+
+    // Text is an intentional one-time editing seed for this sheet.
+    init(initialText: String, save: @escaping (String) -> Void) {
+        self.initialText = initialText
+        _text = State(initialValue: initialText)
+        self.save = save
+    }
+
+    private var hasChanges: Bool { text != initialText }
+
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 16) {
-                NoticeView(title: "Paste original lyrics", message: "Paste lyrics you’re permitted to use. Keep a line break between each lyric and a blank line between verses.")
-                TextEditor(text: $text).font(.body).scrollContentBackground(.hidden).padding(10)
-                    .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 8))
-                    .accessibilityLabel("Original lyrics")
-                Text("Only metadata is saved unless you enable permitted offline caching.").font(.footnote).foregroundStyle(.secondary)
-            }.padding(20).background(LyricaStyle.paper)
+            Form {
+                Section {
+                    TextEditor(text: $text)
+                        .font(.body)
+                        .frame(minHeight: 240)
+                        .focused($isEditing)
+                        .accessibilityLabel("Original lyrics")
+                } header: {
+                    Text("Original lyrics")
+                } footer: {
+                    Text("Paste lyrics you’re permitted to use. Keep a line break between each lyric and a blank line between verses. Only metadata is saved unless you enable permitted offline caching.")
+                }
+            }
             .navigationTitle("Paste lyrics").navigationBarTitleDisplayMode(.inline)
+            .interactiveDismissDisabled(hasChanges)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button("Use lyrics") { save(text); dismiss() }.disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        if hasChanges { confirmsDiscard = true } else { dismiss() }
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Use lyrics") { save(text); dismiss() }
+                        .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { isEditing = false }
+                }
+            }
+            .confirmationDialog("Discard your changes?", isPresented: $confirmsDiscard, titleVisibility: .visible) {
+                Button("Discard changes", role: .destructive) { dismiss() }
+                Button("Keep editing", role: .cancel) { }
             }
         }
     }
