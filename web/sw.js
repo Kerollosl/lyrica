@@ -1,4 +1,4 @@
-const CACHE = "lyrica-shell-v3";
+const CACHE = "lyrica-shell-v4";
 const SHELL = [
   "./",
   "./index.html",

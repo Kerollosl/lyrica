@@ -6,7 +6,7 @@ Built with **SwiftUI · Swift · iOS 18+ · SwiftData · Apple Translation**.
 
 ## Video walkthrough
 
-[Watch the updated MP4 walkthrough](docs/lyrica-walkthrough.mp4). Recorded from the running web app, with captions and original fictional demo lyrics. Included translations demonstrate the interface; this video does not demonstrate a browser model download.
+[Watch the phone-and-desktop MP4 walkthrough](docs/lyrica-walkthrough.mp4). It is recorded from the running web app, with captions outside the controls and original fictional demo lyrics. Included translations demonstrate the interface; this video does not demonstrate a browser model download.
 
 ## Web version
 
@@ -28,7 +28,7 @@ See [web setup, browser compatibility, tests, and free hosting](web/README.md). 
 
 The web and iOS apps use system fonts, neutral light/dark backgrounds, blue controls, compact spacing, and flat lyric rows. The iPhone app uses native lists, forms, navigation, and Dynamic Type. Web navigation adapts from a plain header to a phone tab bar; both readers keep original and translated lines aligned.
 
-[Design system](docs/DESIGN.md) · [24 real web screenshots](docs/web/screenshots/) · [Device acceptance checklist](docs/DEVICE_TESTING.md)
+[Design system](docs/DESIGN.md) · [UI audit](docs/UI_AUDIT.md) · [24 real web screenshots](docs/web/screenshots/) · [Device acceptance checklist](docs/DEVICE_TESTING.md)
 
 <p><img src="docs/web/mobile.png" width="24%" alt="Mobile bilingual reader in dark mode" /> <img src="docs/web/settings.png" width="42%" alt="Reading, appearance, and storage settings in dark mode" /></p>
 
@@ -148,5 +148,6 @@ Search and retrieving new lyrics require a connection. Previously saved lyric/tr
 
 - The original artwork and text in `docs/previews/` are illustrative only.
 - `scripts/generate_previews.py` regenerates the icon and design previews with Python 3, Pillow, and the open-source P052 font available on the authoring system; it is not needed to build the app.
+- `python3 scripts/record_web_walkthrough.py` records the current app on phone and desktop and exports a captioned MP4. Start the local web server first.
 - No signing certificates, provisioning profiles, secrets, or API tokens belong in this repository.
 - The repository’s source-code availability does not convey rights in third-party lyrics, translations, album art, or trademarks. No open-source license has been selected on behalf of the repository owner.

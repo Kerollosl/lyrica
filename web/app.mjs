@@ -62,8 +62,20 @@ function toast(message) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => element.classList.remove("visible"), 5000);
 }
+function updateBrowserTheme() {
+  document.querySelector('meta[name="theme-color"]').content = getComputedStyle(
+    document.documentElement,
+  )
+    .getPropertyValue("--paper")
+    .trim();
+}
+matchMedia("(prefers-color-scheme: dark)").addEventListener(
+  "change",
+  updateBrowserTheme,
+);
 function applySettings() {
   document.documentElement.dataset.theme = state.settings.theme;
+  updateBrowserTheme();
   document.documentElement.style.setProperty(
     "--lyrics-size",
     `${state.settings.font}px`,
@@ -81,7 +93,7 @@ async function refreshSongs() {
 }
 function cover(song, className = "") {
   return song.artworkURL?.startsWith("https://")
-    ? `<img class="cover ${className}" src="${e(song.artworkURL)}" alt="" loading="lazy">`
+    ? `<img class="cover ${className}" src="${e(song.artworkURL)}" alt="" width="160" height="160" loading="lazy">`
     : `<div class="cover ${song.demo ? "demo-cover" : "placeholder-cover"} ${className}" aria-hidden="true">${song.demo ? "" : icon("note")}</div>`;
 }
 function songRow(song, index, action = "open-result", offline = false) {
@@ -95,6 +107,11 @@ function render() {
   const focusedAction = main.contains(document.activeElement)
     ? document.activeElement.dataset.action
     : null;
+  const focusedIndex = document.activeElement?.dataset.index;
+  const focusedRecord = document.activeElement?.dataset.id;
+  const summaryFocused = document.activeElement?.matches(
+    ".reader-options > summary",
+  );
   const optionsOpen = Boolean(document.querySelector(".reader-options")?.open);
   document.querySelectorAll("[data-nav]").forEach((link) => {
     const active =
@@ -112,20 +129,38 @@ function render() {
         : state.page === "settings"
           ? settingsView()
           : searchView();
+  const heading = main.querySelector("h1");
+  if (heading) {
+    heading.id = "page-heading";
+    heading.tabIndex = -1;
+  }
   if (optionsOpen && state.page === "reader") {
     const menu = document.querySelector(".reader-options");
     if (menu) menu.open = true;
   }
   if (focused) document.getElementById(focused)?.focus({ preventScroll: true });
-  else if (focusedAction)
+  else if (focusedAction) {
+    const candidates = [
+      ...main.querySelectorAll(`[data-action="${focusedAction}"]`),
+    ];
+    const target = candidates.find(
+      (element) =>
+        element.dataset.index === focusedIndex &&
+        element.dataset.id === focusedRecord,
+    );
+    target?.focus({ preventScroll: true });
+  } else if (summaryFocused)
     main
-      .querySelector(`[data-action="${focusedAction}"]`)
+      .querySelector(".reader-options > summary")
       ?.focus({ preventScroll: true });
+}
+function focusPageHeading() {
+  main.querySelector("h1")?.focus({ preventScroll: true });
 }
 function searchView() {
   const recentSongs = state.songs.slice(0, 6);
   return `<header class="discover-heading"><h1>Search songs</h1><p>Find lyrics by song, artist, or album.</p></header>
-  <section class="search-panel" aria-label="Find a song"><form id="search-form" role="search"><div class="search-box">${icon("search")}<input type="search" id="song-search" aria-label="Search songs or paste an Apple Music link" placeholder="Search songs, artists, or albums" value="${e(state.query)}" autocomplete="off" spellcheck="false"><button class="search-submit" type="submit" aria-label="Search">Search ${icon("arrow")}</button></div></form><div class="search-help"><span>${icon("link")} Or paste an Apple Music song link</span><span>Press <kbd>/</kbd> to search</span></div>
+  <section class="search-panel" aria-label="Find a song"><form id="search-form" role="search"><div class="search-box">${icon("search")}<input type="search" id="song-search" name="song" aria-label="Search songs or paste an Apple Music link" placeholder="Song, artist, or album" value="${e(state.query)}" autocomplete="off" spellcheck="false"><button class="search-submit" type="submit" aria-label="Search">Search ${icon("arrow")}</button></div></form><div class="search-help"><span>${icon("link")} Or paste an Apple Music song link</span><span>Press <kbd>/</kbd> to search</span></div>
   ${state.recent.length ? `<div class="recent"><span>Recent</span>${state.recent.map((query, index) => `<button class="chip" data-action="recent" data-index="${index}">${icon("clock")}${e(query)}</button>`).join("")}<button class="plain" data-action="clear-recent">Clear</button></div>` : ""}<div id="search-results" aria-live="polite">${searchResults()}</div></section>
   ${
     !state.query
@@ -151,18 +186,18 @@ function libraryView() {
           .toLowerCase()
           .includes(state.libraryQuery.toLowerCase())),
   );
-  return `<header class="page-head"><h1 class="page-title">Library</h1></header><div class="library-tools"><div class="segmented" aria-label="Library filter"><button data-action="history" aria-pressed="${!state.favorites}" class="${!state.favorites ? "selected" : ""}">${icon("clock")} Recently viewed</button><button data-action="favorites" aria-pressed="${state.favorites}" class="${state.favorites ? "selected" : ""}">${icon("heart")} Favorites</button></div><div class="library-search-wrap">${icon("search")}<input type="search" class="library-search" id="library-search" aria-label="Search your library" placeholder="Find a saved song" value="${e(state.libraryQuery)}"></div></div><div id="library-records" class="${state.favorites ? "favorite-grid" : "library-list"}">${records.length ? records.map((record) => `<article class="library-item">${songRow(record.song, record.id, "open-library", Boolean(record.document))}<button class="icon-button remove-song" data-action="remove" data-id="${e(record.id)}" aria-label="Remove ${e(record.song.title)}">${icon("close")}</button></article>`).join("") : `<div class="empty-state">${icon(state.favorites ? "heart" : "library")}<h2>${state.libraryQuery ? "No matching songs" : state.favorites ? "No favorites yet" : "No songs yet"}</h2><p>${state.libraryQuery ? "Try another title, artist, or album." : "Open a song and tap the heart to save it to favorites."}</p><button class="primary" data-action="demo">Open demo ${icon("arrow")}</button></div>`}</div><p class="storage-note">${icon("download")} Saved lyrics and previously translated languages are available offline. Bookmarks keep just the song details.</p>`;
+  return `<header class="page-head"><h1 class="page-title">Library</h1></header><div class="library-tools"><div class="segmented" aria-label="Library filter"><button data-action="history" aria-pressed="${!state.favorites}" class="${!state.favorites ? "selected" : ""}">${icon("clock")} Recently viewed</button><button data-action="favorites" aria-pressed="${state.favorites}" class="${state.favorites ? "selected" : ""}">${icon("heart")} Favorites</button></div><div class="library-search-wrap">${icon("search")}<input type="search" class="library-search" id="library-search" name="library-query" aria-label="Search your library" placeholder="Find a saved song" value="${e(state.libraryQuery)}"></div></div><div id="library-records" class="${state.favorites ? "favorite-grid" : "library-list"}">${records.length ? records.map((record) => `<article class="library-item">${songRow(record.song, record.id, "open-library", Boolean(record.document))}<button class="icon-button remove-song" data-action="remove" data-id="${e(record.id)}" aria-label="Remove ${e(record.song.title)} from library">${icon("close")}</button></article>`).join("") : `<div class="empty-state">${icon(state.favorites ? "heart" : "library")}<h2>${state.libraryQuery ? "No matching songs" : state.favorites ? "No favorites yet" : "No songs yet"}</h2><p>${state.libraryQuery ? "Try another title, artist, or album." : state.favorites ? "Open a song and tap the heart to save it to favorites." : "Songs you open will appear here."}</p><button class="primary" data-action="demo">Open demo ${icon("arrow")}</button></div>`}</div><p class="storage-note">${icon("download")} Saved lyrics and previously translated languages are available offline. Bookmarks keep just the song details.</p>`;
 }
 function readerView() {
   const reader = state.reader;
   if (!reader) return "";
   const source = state.source || reader.document?.language || "";
-  return `<div class="reader-top"><button class="back-button" data-action="back">${icon("back")} ${readerOrigin === "library" ? "Library" : "Search"}</button><div class="reader-actions"><button class="favorite-button ${reader.favorite ? "is-saved" : ""}" data-action="favorite" aria-label="${reader.favorite ? "Remove from favorites" : "Save favorite"}" aria-pressed="${Boolean(reader.favorite)}">${icon("heart", reader.favorite)}<span>${reader.favorite ? "Saved" : "Save song"}</span></button><details class="reader-options"><summary aria-label="Reader options">${icon("settings")}<span>Reader options</span></summary><div class="options-menu"><span class="menu-label">Text size</span><div class="font-controls"><button class="icon-button" data-action="smaller" aria-label="Smaller lyrics">A−</button><span>${state.settings.font}px</span><button class="icon-button" data-action="larger" aria-label="Larger lyrics">A+</button></div><button data-action="layout" aria-label="Switch between columns and stacked layout" aria-pressed="${state.stacked}">${icon("layout")} ${state.stacked ? "Use columns" : "Stack translations"}</button><button data-action="manual-original">${icon("note")} Paste or replace lyrics</button><button data-action="manual-translation" ${!reader.document ? "disabled" : ""}>${icon("languages")} Paste a translation</button></div></details></div></div>
+  return `<div class="reader-top"><button class="back-button" data-action="back">${icon("back")} ${readerOrigin === "library" ? "Library" : "Search"}</button><div class="reader-actions"><button class="favorite-button ${reader.favorite ? "is-saved" : ""}" data-action="favorite" aria-label="${reader.favorite ? "Saved; remove from favorites" : "Save favorite"}" aria-pressed="${Boolean(reader.favorite)}">${icon("heart", reader.favorite)}<span>${reader.favorite ? "Saved" : "Save"}</span></button><details class="reader-options"><summary aria-label="Reader options">${icon("settings")}<span>Reader options</span></summary><div class="options-menu"><span class="menu-label">Text size</span><div class="font-controls"><button class="icon-button" data-action="smaller" aria-label="Smaller lyrics">A−</button><span>${state.settings.font}px</span><button class="icon-button" data-action="larger" aria-label="Larger lyrics">A+</button></div><button data-action="layout" aria-label="Switch between columns and stacked layout" aria-pressed="${state.stacked}">${icon("layout")} ${state.stacked ? "Use columns" : "Stack translations"}</button><button data-action="manual-original">${icon("note")} Paste or replace lyrics</button><button data-action="manual-translation" ${!reader.document ? "disabled" : ""}>${icon("languages")} Paste a translation</button></div></details></div></div>
   <header class="reader-song">${cover(reader.song)}<div><h1>${e(reader.song.title)}</h1><p><strong>${e(reader.song.artist)}</strong><span aria-hidden="true"> · </span>${e(reader.song.album)}</p></div></header>
-  <div class="language-bar"><div class="language-control"><label for="source-language">Original</label><select id="source-language"><option value="" ${!source ? "selected" : ""}>Detect / choose language</option>${options(source)}</select></div><span class="language-arrow">${icon("arrow")}</span><div class="language-control"><label for="target-language">Translation</label><select id="target-language">${options(state.target)}</select></div><span class="on-device">${icon(reader.song.demo ? "languages" : "lock")}${reader.song.demo ? "Example translations" : "On-device translation"}</span></div><div id="translation-status" role="status">${translationNotice()}</div>
+  <div class="language-bar"><div class="language-control"><label for="source-language">Original</label><select id="source-language"><option value="" ${!source ? "selected" : ""}>Detect / choose language</option>${options(source)}</select></div><div class="language-control"><label for="target-language">Translation</label><select id="target-language">${options(state.target)}</select></div></div><div id="translation-status" role="status">${translationNotice()}</div>
   ${
     reader.document
-      ? `<section class="bilingual-panel ${state.stacked ? "stacked" : ""}" aria-label="Bilingual lyrics"><div class="lyric-columns"><span>Original <small>${e(languages[source] || "Auto")}</small></span><span>Translation <small>${e(languages[state.target] || state.target)}</small></span></div><div id="lyric-lines">${reader.document.text
+      ? `<section class="bilingual-panel ${state.stacked ? "stacked" : ""}" aria-label="Bilingual lyrics"><p class="reader-guide">Original above · translation below</p><div id="lyric-lines">${reader.document.text
           .split("\n")
           .map((line, index) =>
             line
@@ -178,7 +213,7 @@ function readerView() {
 }
 function translationNotice() {
   if (state.reader?.loading)
-    return '<div class="notice"><span class="spinner"></span>Finding the words…</div>';
+    return '<div class="notice"><span class="spinner"></span>Finding lyrics…</div>';
   if (!state.message) return "";
   return `<div class="notice status-inline">${state.translating ? '<span class="spinner"></span>' : ""}${e(state.message)}${!state.translating && state.reader?.document && !state.lines.length ? '<button class="plain" data-action="translate">Translate on this device</button><button class="plain" data-action="manual-translation">Paste translation</button>' : ""}${!state.reader?.document ? '<button class="plain" data-action="retry-lyrics">Retry</button><button class="plain" data-action="manual-original">Paste lyrics</button>' : ""}</div>`;
 }
@@ -186,7 +221,7 @@ function settingsView() {
   return `<header class="page-head"><h1 class="page-title">Settings</h1></header><div class="settings-grid">
   <section class="setting-section"><h2>${icon("text")} Reading</h2><div class="setting-row"><label for="default-language">Default translation language</label><select id="default-language">${options(state.settings.target)}</select></div><div class="setting-row"><label for="font-size">Lyrics text size <small id="font-value">${state.settings.font}px</small></label><input id="font-size" type="range" min="15" max="30" value="${state.settings.font}"></div></section>
   <section class="setting-section"><h2>${icon("settings")} Appearance</h2><div class="setting-row"><label for="theme">Color theme<small>Follow your device, or choose your own.</small></label><select id="theme">${["system", "light", "dark"].map((value) => `<option value="${value}" ${value === state.settings.theme ? "selected" : ""}>${value[0].toUpperCase() + value.slice(1)}</option>`).join("")}</select></div></section>
-  <section class="setting-section"><h2>${icon("download")} Storage</h2><div class="setting-row"><label for="cache">Save permitted lyrics offline<small>Only save lyrics and translations you’re permitted to keep.</small></label><input id="cache" type="checkbox" ${state.settings.cache ? "checked" : ""}></div><p>${state.songs.filter((song) => song.document).length} originals saved · ${state.songs.filter((song) => song.favorite).length} favorites. Stored on this browser, separate from your iPhone library.</p><div class="storage-buttons"><button class="plain" data-action="clear-cache">Clear lyrics & translations</button><button class="plain" data-action="clear-recent">Clear recent searches</button><button class="plain danger" data-action="delete-all">Delete library & history</button></div></section>
+  <section class="setting-section"><h2>${icon("download")} Storage</h2><label class="setting-row cache-setting" for="cache"><span>Save permitted lyrics offline<small>Only save lyrics and translations you’re permitted to keep.</small></span><span class="switch-target"><input id="cache" type="checkbox" ${state.settings.cache ? "checked" : ""}></span></label><p>${state.songs.filter((song) => song.document).length} originals saved · ${state.songs.filter((song) => song.favorite).length} favorites. Stored on this browser, separate from your iPhone library.</p><div class="storage-buttons"><button class="plain" data-action="clear-cache">Clear lyrics & translations</button><button class="plain" data-action="clear-recent">Clear recent searches</button><button class="plain danger" data-action="delete-all">Delete library & history</button></div></section>
   <details class="setting-section about-details"><summary>About Lyrica & privacy</summary><div class="about-content"><p>Search and metadata come from Apple’s iTunes API. Lyrics come from LRCLIB. Availability does not grant copyright or redistribution rights. Only paste or store material you’re authorized to use.</p><p>Automatic web translation uses the browser’s on-device Translator API where available (supported desktop Chrome versions, compatible hardware and language pairs). It may need a free model download and a manual source-language selection. Safari, Firefox, and many mobile browsers don’t provide this API; paste translations or explore the original bilingual demo there. Apple Translation is exclusive to the native iPhone app.</p><p>Queries go directly to Apple, and recording metadata goes directly to LRCLIB. Lyrica has no analytics, accounts, server, paid API, or cloud sync. Only the application shell is cached automatically; lyric storage is opt-in. Clearing browser data removes your library. Browser-managed translation models are managed by the browser.</p><a class="plain" href="https://github.com/Kerollosl/lyrica" target="_blank" rel="noopener">Explore the iPhone app and source ${icon("external")}</a></div></details></div>`;
 }
 async function search() {
@@ -268,6 +303,7 @@ async function openSong(song, saved) {
     state.source = "es";
   }
   render();
+  focusPageHeading();
   window.scrollTo(0, 0);
   await persist();
   if (state.reader.document) await prepare();
@@ -321,7 +357,7 @@ async function prepare(userGesture = false) {
     if (reader.translations[key]) {
       state.lines = reader.translations[key];
       state.message = reader.song.demo
-        ? "Example translations included."
+        ? ""
         : "Saved translation · Available offline.";
       render();
       return;
@@ -378,29 +414,106 @@ async function prepare(userGesture = false) {
     }
   }
 }
+let dialogInitialText = "";
+let dialogPending = false;
+function dialogHasDraft() {
+  const field = dialog.querySelector("#manual-text");
+  return dialog.open && field && field.value !== dialogInitialText;
+}
+function requestDialogClose() {
+  if (dialogPending) return;
+  if (dialogHasDraft()) {
+    dialog.querySelector(".error").textContent =
+      "Your changes haven’t been saved. Keep editing or discard them.";
+    dialog.querySelector('[data-action="discard-draft"]').hidden = false;
+    return;
+  }
+  dialog.close();
+}
+dialog.addEventListener("cancel", (event) => {
+  event.preventDefault();
+  requestDialogClose();
+});
+window.addEventListener("beforeunload", (event) => {
+  if (dialogHasDraft()) {
+    event.preventDefault();
+    event.returnValue = "";
+  }
+});
 function showDialog(
   title,
   body,
   confirm,
   onConfirm,
-  { textarea = "", confirmLabel = "Continue" } = {},
+  {
+    textarea = "",
+    confirmLabel = "Continue",
+    cancelLabel = "Cancel",
+    originalText = "",
+  } = {},
 ) {
-  dialog.innerHTML = `<form id="dialog-form"><h2 id="dialog-title">${e(title)}</h2><p>${e(body)}</p>${textarea ? `<label class="eyebrow" for="manual-text">${e(textarea)}</label><textarea id="manual-text" spellcheck="false"></textarea>` : ""}<p class="error" role="alert"></p><div class="dialog-actions"><button type="button" class="plain" data-action="close-dialog">Cancel</button><button type="submit" class="primary">${e(confirmLabel || confirm)}</button></div></form>`;
+  const opener = document.activeElement;
+  const openerID = opener?.id;
+  const openerAction = opener?.dataset.action;
+  dialogPending = false;
+  dialog.innerHTML = `<form id="dialog-form"><h2 id="dialog-title">${e(title)}</h2><p id="dialog-description">${e(body)}</p>${originalText ? `<details class="source-preview"><summary>View original lyrics</summary><pre>${e(originalText)}</pre></details>` : ""}${textarea ? `<label for="manual-text">${e(textarea)}</label><textarea id="manual-text" name="lyrics" spellcheck="false" aria-describedby="dialog-error"></textarea>` : ""}<p id="dialog-error" class="error" role="alert"></p><div class="dialog-actions"><button type="button" class="plain" data-action="close-dialog">${e(cancelLabel)}</button><button type="button" class="plain danger" data-action="discard-draft" hidden>Discard changes</button><button type="submit" class="primary">${e(confirmLabel || confirm)}</button></div></form>`;
   dialog.setAttribute("aria-labelledby", "dialog-title");
+  dialog.setAttribute("aria-describedby", "dialog-description");
+  dialog.onclose = () => {
+    queueMicrotask(() => {
+      const target = opener?.isConnected
+        ? opener
+        : openerID
+          ? document.getElementById(openerID)
+          : openerAction
+            ? main.querySelector(`[data-action="${openerAction}"]`)
+            : null;
+      if (
+        target &&
+        (target.checkVisibility
+          ? target.checkVisibility()
+          : target.getClientRects().length &&
+            (!target.closest("details") || target.closest("details").open))
+      )
+        target.focus({ preventScroll: true });
+      else
+        main
+          .querySelector(".reader-options > summary")
+          ?.focus({ preventScroll: true });
+    });
+  };
   dialog.showModal();
+  queueMicrotask(() => {
+    const field = dialog.querySelector("#manual-text");
+    dialogInitialText = field?.value ?? "";
+    field?.focus();
+  });
   document.querySelector("#dialog-form").onsubmit = async (event) => {
     event.preventDefault();
+    if (dialogPending) return;
+    const form = event.currentTarget;
+    const submit = form.querySelector('[type="submit"]');
+    dialogPending = true;
+    submit.disabled = true;
+    form.setAttribute("aria-busy", "true");
     try {
       await onConfirm(document.querySelector("#manual-text")?.value);
       dialog.close();
     } catch (error) {
       dialog.querySelector(".error").textContent = error.message;
+      const field = dialog.querySelector("#manual-text");
+      field?.setAttribute("aria-invalid", "true");
+      field?.focus();
+    } finally {
+      dialogPending = false;
+      submit.disabled = false;
+      form.removeAttribute("aria-busy");
     }
   };
 }
 function permission(onConfirm) {
   showDialog(
-    "Keep the words with you?",
+    "Enable offline reading?",
     "Enable offline storage only for lyrics and translations you’re permitted to keep. They stay in this browser. Favorite bookmarks work without storing lyrics.",
     "Enable",
     async () => {
@@ -410,10 +523,16 @@ function permission(onConfirm) {
       await persist();
       render();
     },
-    { confirmLabel: "Enable permitted offline storage" },
+    {
+      confirmLabel: "Enable permitted offline storage",
+      cancelLabel:
+        state.page === "reader" && state.reader?.favorite
+          ? "Keep bookmark only"
+          : "Not now",
+    },
   );
 }
-async function navigate() {
+async function navigate(focus = false) {
   translationController?.abort();
   lyricsController?.abort();
   searchController?.abort();
@@ -426,27 +545,12 @@ async function navigate() {
     : "search";
   await refreshSongs();
   render();
+  if (focus) focusPageHeading();
   window.scrollTo(0, 0);
 }
-window.addEventListener("hashchange", () =>
-  navigate().catch((error) => toast(error.message)),
-);
-// Opening a reader keeps its originating tab's hash. Reselecting that tab
-// should return to its root even though the browser emits no hashchange.
-document.querySelectorAll("a[data-nav], a.brand").forEach((link) => {
-  link.addEventListener("click", (event) => {
-    if (
-      !event.ctrlKey &&
-      !event.metaKey &&
-      !event.shiftKey &&
-      !event.altKey &&
-      event.button === 0 &&
-      location.hash === link.hash
-    ) {
-      event.preventDefault();
-      navigate().catch((error) => toast(error.message));
-    }
-  });
+window.addEventListener("hashchange", () => {
+  if (["", "#search", "#library", "#settings"].includes(location.hash))
+    navigate(true).catch((error) => toast(error.message));
 });
 document.addEventListener("submit", (event) => {
   if (event.target.id === "search-form") {
@@ -520,11 +624,16 @@ document.addEventListener("click", async (event) => {
   const nav = event.target.closest('a[href^="#"]');
   if (
     nav &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.altKey &&
+    !event.shiftKey &&
+    event.button === 0 &&
     ["#search", "#library", "#settings"].includes(nav.getAttribute("href")) &&
     location.hash === nav.getAttribute("href")
   ) {
     event.preventDefault();
-    await navigate().catch((error) => toast(error.message));
+    await navigate(true).catch((error) => toast(error.message));
     return;
   }
   const button = event.target.closest("[data-action]");
@@ -548,6 +657,7 @@ document.addEventListener("click", async (event) => {
       lyricsController?.abort();
       revision++;
       render();
+      focusPageHeading();
     }
     if (action === "recent") {
       state.query = state.recent[Number(button.dataset.index)];
@@ -599,7 +709,8 @@ document.addEventListener("click", async (event) => {
             : "Removed from favorites",
         );
     }
-    if (action === "close-dialog") dialog.close();
+    if (action === "close-dialog") requestDialogClose();
+    if (action === "discard-draft") dialog.close();
     if (action === "remove")
       showDialog(
         "Remove this song?",
@@ -646,7 +757,7 @@ document.addEventListener("click", async (event) => {
     if (action === "manual-original") {
       const reader = state.reader;
       showDialog(
-        "Bring your own words",
+        "Paste original lyrics",
         "Paste lyrics you’re permitted to use. Keep the original line breaks and blank lines between verses.",
         "Use lyrics",
         async (text) => {
@@ -657,6 +768,7 @@ document.addEventListener("click", async (event) => {
           reader.document = { text: cleaned, source: "manual" };
           reader.translations = {};
           await persist();
+          state.selected = -1;
           await prepare();
         },
         { textarea: "Original lyrics", confirmLabel: "Use lyrics" },
@@ -667,8 +779,8 @@ document.addEventListener("click", async (event) => {
     if (action === "manual-translation") {
       const reader = state.reader;
       showDialog(
-        "A meaning of your own",
-        `Paste a ${languages[state.target]} translation, one line per original line. Blank verse breaks will be preserved.`,
+        "Paste a translation",
+        `Paste a ${languages[state.target]} translation with ${reader.document.text.split("\n").filter(Boolean).length} nonblank lines, one per original line. Blank verse breaks will be preserved.`,
         "Use translation",
         async (text) => {
           const lines = alignTranslation(reader.document.text, text);
@@ -681,7 +793,11 @@ document.addEventListener("click", async (event) => {
           await persist();
           render();
         },
-        { textarea: "Translated lyrics", confirmLabel: "Use translation" },
+        {
+          textarea: "Translated lyrics",
+          confirmLabel: "Use translation",
+          originalText: reader.document.text,
+        },
       );
     }
   } catch (error) {

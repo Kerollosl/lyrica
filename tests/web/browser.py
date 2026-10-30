@@ -59,7 +59,7 @@ def test_reading_and_storage(browser):
     # A bookmark can be saved while declining lyric storage.
     page.get_by_role("button", name="Save favorite", exact=True).click()
     expect(page.locator("dialog")).to_be_visible()
-    page.get_by_role("button", name="Cancel", exact=True).click()
+    page.get_by_role("button", name="Keep bookmark only", exact=True).click()
     navigate(page, "library")
     expect(page.locator('[data-action="open-library"]', has_text=DEMO_TITLE)).to_be_visible()
     assert page.locator(".song-duration", has_text="Saved").count() == 0
@@ -118,7 +118,7 @@ def test_reading_and_storage(browser):
     expect(page.locator('[data-action="open-library"]')).to_have_count(2)
 
     # Destructive actions require a concrete confirmation dialog.
-    page.get_by_role("button", name=f"Remove {DEMO_TITLE}", exact=True).click()
+    page.get_by_role("button", name=f"Remove {DEMO_TITLE} from library", exact=True).click()
     page.get_by_role("button", name="Remove song", exact=True).click()
     expect(page.locator('[data-action="open-library"]')).to_have_count(1)
     navigate(page, "settings")
@@ -307,14 +307,14 @@ def test_compact_layout_and_forced_colors(browser):
     dialog = page.locator("dialog")
     expect(dialog).to_be_visible()
     bounds = dialog.bounding_box()
-    for name in ["Cancel", "Enable permitted offline storage"]:
+    for name in ["Not now", "Enable permitted offline storage"]:
         button = dialog.get_by_role("button", name=name, exact=True)
         expect(button).to_be_visible()
         button_bounds = button.bounding_box()
         assert button_bounds["x"] >= bounds["x"], f"Permission choice clipped on the left: {name}"
         assert button_bounds["x"] + button_bounds["width"] <= bounds["x"] + bounds["width"], f"Permission choice clipped on the right: {name}"
         assert button_bounds["y"] + button_bounds["height"] <= bounds["y"] + bounds["height"], f"Permission choice clipped below dialog: {name}"
-    dialog.get_by_role("button", name="Cancel", exact=True).click()
+    dialog.get_by_role("button", name="Not now", exact=True).click()
     expect(dialog).not_to_be_visible()
     context.close()
 
@@ -349,6 +349,128 @@ def test_compact_layout_and_forced_colors(browser):
     print("PASS compact/high-contrast regressions: unbroken song metadata, 320px permission choices, visible cache and selected states")
 
 
+
+def test_reader_refinement(browser):
+    context = browser.new_context(viewport={"width": 1440, "height": 1050}, service_workers="block")
+    page = context.new_page()
+    visit(page)
+    open_demo(page)
+
+    # Language controls describe the same physical columns as the lyric cells.
+    # This catches the former third status column squeezing both selectors left.
+    row = page.locator(".lyric-row").first
+    for control, cell in [("#source-language", ".lyric-row > span:first-child"), ("#target-language", ".lyric-row > span.translated")]:
+        control_box = page.locator(control).bounding_box()
+        cell_box = page.locator(cell).first.bounding_box()
+        assert abs(control_box["x"] - cell_box["x"]) <= 1, f"Language/lyric column misalignment: {control_box}, {cell_box}"
+        assert abs(control_box["width"] - cell_box["width"]) <= 1, f"Language/lyric column width mismatch: {control_box}, {cell_box}"
+    expect(page.locator(".reader-guide")).not_to_be_visible()
+
+    # A translated rerender must retain keyboard position on the same lyric,
+    # rather than silently sending the reader to the first row.
+    selected = page.locator(".lyric-row").nth(3)
+    selected.focus()
+    page.keyboard.press("Space")
+    expect(selected).to_have_attribute("aria-pressed", "true")
+    page.locator("#target-language").select_option("fr")
+    expect(selected).to_be_focused()
+    expect(selected).to_have_attribute("aria-pressed", "true")
+    page.locator("#target-language").select_option("en")
+    expect(selected).to_be_focused()
+
+    reader_options(page).get_by_role("button", name="Paste or replace lyrics", exact=True).click()
+    field = page.locator("#manual-text")
+    expect(field).to_be_focused()
+    field.fill("Un nuevo comienzo\n\nCada palabra vuelve a casa")
+    page.keyboard.press("Escape")
+    expect(page.locator("dialog")).to_be_visible()
+    expect(field).to_have_value("Un nuevo comienzo\n\nCada palabra vuelve a casa")
+    expect(page.get_by_role("button", name="Discard changes", exact=True)).to_be_visible()
+    page.get_by_role("button", name="Discard changes", exact=True).click()
+    expect(page.locator("dialog")).not_to_be_visible()
+    # The disclosure closes when the dialog is used; return to its visible summary.
+    expect(page.locator(".reader-options > summary")).to_be_focused()
+    expect(selected).to_have_attribute("aria-pressed", "true")
+
+    # Hold a supported API boundary to make the in-flight save observable.
+    # Repeated submit events must not start a second translation preparation.
+    page.evaluate("""() => {
+      window.availabilityCalls = 0;
+      Object.defineProperty(window, 'Translator', { configurable: true, value: {
+        availability() {
+          window.availabilityCalls++;
+          return new Promise(resolve => { window.releaseAvailability = () => resolve('unavailable'); });
+        }
+      }});
+    }""")
+    reader_options(page).get_by_role("button", name="Paste or replace lyrics", exact=True).click()
+    field.fill("Un nuevo comienzo\n\nCada palabra vuelve a casa")
+    page.get_by_role("button", name="Use lyrics", exact=True).click()
+    page.wait_for_function("window.availabilityCalls === 1")
+    expect(page.get_by_role("button", name="Use lyrics", exact=True)).to_be_disabled()
+    page.locator("#dialog-form").evaluate("form => form.requestSubmit()")
+    assert page.evaluate("window.availabilityCalls") == 1, "Repeated save started another translation operation"
+    page.evaluate("window.releaseAvailability()")
+    expect(page.locator("dialog")).not_to_be_visible()
+    expect(page.get_by_text("Un nuevo comienzo", exact=True)).to_be_visible()
+    expect(page.locator('.lyric-row[aria-pressed="true"]')).to_have_count(0)
+
+    # Validation announces the problem and returns input focus to its source.
+    reader_options(page).get_by_role("button", name="Paste a translation", exact=True).click()
+    field.fill("Only one line")
+    page.get_by_role("button", name="Use translation", exact=True).click()
+    expect(field).to_have_attribute("aria-invalid", "true")
+    expect(field).to_be_focused()
+    expect(page.locator("dialog [role=alert]")).to_contain_text("one translated line")
+    page.get_by_role("button", name="Cancel", exact=True).click()
+    expect(page.locator("dialog")).to_be_visible()
+    page.get_by_role("button", name="Discard changes", exact=True).click()
+    context.close()
+
+    context = browser.new_context(viewport={"width": 390, "height": 844}, service_workers="block", has_touch=True)
+    page = context.new_page()
+    visit(page)
+    open_demo(page)
+    expect(page.locator(".reader-guide")).to_be_visible()
+    assert_no_overflow(page, "compact reader after header consolidation")
+    # Focus scrolls the lyric above the bottom tab bar and below pinned controls.
+    line = page.locator(".lyric-row").last
+    line.focus()
+    line_box = line.bounding_box()
+    bar_box = page.locator(".language-bar").bounding_box()
+    nav_box = page.locator("nav").bounding_box()
+    assert line_box["y"] >= bar_box["y"] + bar_box["height"] - 1, "Focused lyric is covered by sticky languages"
+    assert line_box["y"] + line_box["height"] <= nav_box["y"] + 1, "Focused lyric is covered by bottom navigation"
+    context.close()
+    print("PASS reader refinement: shared column geometry, exact-row keyboard focus, protected drafts, single save, validation focus, original-edit reset and unobscured mobile focus")
+
+
+def test_theme_and_cache_target(browser):
+    context = browser.new_context(viewport={"width": 390, "height": 844}, service_workers="block", color_scheme="light")
+    page = context.new_page()
+    visit(page)
+    navigate(page, "settings")
+    page.locator("#theme").select_option("system")
+    page.emulate_media(color_scheme="dark")
+    expect(page.locator('meta[name="theme-color"]')).to_have_attribute("content", "#111")
+    page.emulate_media(color_scheme="light")
+    expect(page.locator('meta[name="theme-color"]')).to_have_attribute("content", "#fff")
+    page.locator("#theme").select_option("dark")
+    expect(page.locator('meta[name="theme-color"]')).to_have_attribute("content", "#111")
+    page.locator("#theme").select_option("light")
+    page.emulate_media(color_scheme="dark")
+    expect(page.locator('meta[name="theme-color"]')).to_have_attribute("content", "#fff")
+    target = page.locator(".cache-setting")
+    bounds = target.bounding_box()
+    assert bounds["height"] >= 44, "Offline setting has no full-height touch target"
+    target.locator("span").first.click()
+    expect(page.locator("dialog")).to_be_visible()
+    page.get_by_role("button", name="Not now", exact=True).click()
+    expect(page.locator("#cache")).not_to_be_checked()
+    context.close()
+    print("PASS theme/cache targets: browser chrome follows system and explicit themes, full-row cache label opens consent without opting in")
+
+
 def test_offline_shell(browser):
     context = browser.new_context(service_workers="allow")
     page = context.new_page()
@@ -374,6 +496,8 @@ if __name__ == "__main__":
             test_lyrics_error_state(browser)
             test_viewports(browser)
             test_compact_layout_and_forced_colors(browser)
+            test_reader_refinement(browser)
+            test_theme_and_cache_target(browser)
             test_offline_shell(browser)
         finally:
             browser.close()

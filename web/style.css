@@ -1106,10 +1106,11 @@ kbd {
   position: sticky;
   top: var(--header-height);
   z-index: 20;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 13px 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 24px;
+  padding: 12px 10px;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   background: var(--paper);
@@ -1137,49 +1138,18 @@ kbd {
   font-size: 14px;
   line-height: 1.4;
 }
-.language-arrow {
-  display: inline-flex;
-  color: var(--muted);
-  padding-top: 20px;
-}
-.language-arrow .icon {
-  width: 17px;
-  height: 17px;
-}
-.on-device {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding-left: 5px;
-  margin-top: 20px;
-  color: var(--muted);
-  font-size: 12px;
-  white-space: nowrap;
-}
-.on-device .icon {
-  width: 14px;
-  height: 14px;
-}
 .bilingual-panel {
-  margin-top: 16px;
+  margin-top: 12px;
 }
-.lyric-columns {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 24px;
-  padding: 0 10px 12px;
-  margin-bottom: 10px;
-  border-bottom: 1px solid var(--line);
+.reader-guide {
+  display: none;
+  margin: 0 6px 10px;
   font-size: 13px;
   line-height: 1.5;
-  font-weight: 500;
-  direction: ltr;
-}
-.lyric-columns small {
-  margin-left: 5px;
   color: var(--muted);
-  font-size: 13px;
-  font-weight: 400;
+}
+.stacked .reader-guide {
+  display: block;
 }
 .lyric-row {
   display: grid;
@@ -1188,7 +1158,7 @@ kbd {
   gap: 24px;
   min-height: 44px;
   width: 100%;
-  padding: 10px;
+  padding: 8px 10px;
   border-radius: 4px;
   background: transparent;
   color: var(--ink);
@@ -1225,12 +1195,6 @@ kbd {
 .stacked .lyric-row {
   grid-template-columns: 1fr;
   gap: 5px;
-}
-.stacked .lyric-columns {
-  grid-template-columns: 1fr;
-}
-.stacked .lyric-columns span:last-child {
-  display: none;
 }
 .lyric-foot {
   margin-top: 18px;
@@ -1402,6 +1366,7 @@ kbd {
 
 /* Native dialog focus behavior; elevation is reserved for overlays. */
 dialog {
+  overscroll-behavior: contain;
   width: min(560px, calc(100% - 32px));
   max-height: 90dvh;
   margin: auto;
@@ -1509,9 +1474,6 @@ noscript {
 }
 @media (max-width: 800px) {
   .iphone-link {
-    display: none;
-  }
-  .on-device {
     display: none;
   }
   nav {
@@ -1745,8 +1707,11 @@ noscript {
     font-size: 13px;
   }
   .language-bar {
-    gap: 9px;
-    padding: 11px 0;
+    gap: 16px;
+    padding: 10px 6px;
+  }
+  .reader-guide {
+    display: block;
   }
   .language-control {
     gap: 5px;
@@ -1759,25 +1724,10 @@ noscript {
     min-height: 44px;
     padding: 8px;
   }
-  .language-arrow {
-    padding-top: 19px;
-  }
-  .language-arrow .icon {
-    width: 15px;
-    height: 15px;
-  }
-  .lyric-columns {
-    grid-template-columns: 1fr;
-    padding: 0 6px 10px;
-    font-size: 13px;
-  }
-  .lyric-columns span:last-child {
-    display: none;
-  }
   .lyric-row {
     grid-template-columns: 1fr;
     gap: 5px;
-    padding: 10px 6px;
+    padding: 8px 6px;
   }
   .lyric-row .translated {
     font-size: 0.95em;
@@ -1873,5 +1823,118 @@ noscript {
   .segmented button.selected {
     outline: 2px solid Highlight;
     outline-offset: -2px;
+  }
+}
+
+/* Focus stays clear of the pinned reader controls and phone tab bar. */
+html {
+  scroll-padding-top: calc(var(--header-height) + 108px);
+  scroll-padding-bottom: 88px;
+}
+.lyric-row {
+  scroll-margin-top: calc(var(--header-height) + 108px);
+  scroll-margin-bottom: 88px;
+}
+button,
+a,
+select,
+summary {
+  touch-action: manipulation;
+}
+#page-heading:focus {
+  outline: none;
+}
+.cache-setting {
+  cursor: pointer;
+}
+.cache-setting > span:first-child {
+  display: grid;
+  gap: 5px;
+}
+.switch-target {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  flex-shrink: 0;
+}
+.setting-row small,
+.lyric-foot {
+  font-size: 13px;
+}
+.dialog-actions [hidden] {
+  display: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .collection-card:hover strong {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+}
+@media (hover: none) {
+  .lyric-row:hover,
+  .song-row:hover {
+    background: transparent;
+  }
+  .lyric-row[aria-pressed="true"] {
+    background: var(--accent-soft);
+  }
+}
+
+.dialog-actions .primary {
+  white-space: normal;
+  max-width: 100%;
+  text-align: center;
+}
+.source-preview {
+  margin: 16px 0;
+  font-size: 14px;
+}
+.source-preview summary {
+  min-height: 44px;
+  padding: 10px 0;
+  color: var(--accent);
+}
+.source-preview pre {
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  line-height: 1.6;
+  padding: 12px;
+  background: var(--field);
+  border-radius: 6px;
+}
+@media (max-width: 600px) {
+  .dialog-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .dialog-actions .primary {
+    grid-row: 1;
+    width: 100%;
+  }
+  .dialog-actions .plain {
+    justify-content: center;
+  }
+}
+
+.reader-options > summary {
+  min-width: 44px;
+  justify-content: center;
+}
+@media (max-width: 360px) {
+  .setting-row:has(select) {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .setting-row select {
+    max-width: 100%;
+    width: 100%;
+    padding-left: 0;
   }
 }
