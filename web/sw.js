@@ -1,4 +1,4 @@
-const CACHE = "lyrica-shell-v5";
+const CACHE = "lyrica-shell-v6";
 const SHELL = [
   "./",
   "./index.html",
@@ -11,6 +11,7 @@ const SHELL = [
   "./translation.mjs",
   "./translation-models.mjs",
   "./translation-worker.mjs",
+  "./translation-text.mjs",
   "./icon.png",
   "./manifest.webmanifest",
 ];

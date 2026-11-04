@@ -1,12 +1,9 @@
-import {
-  models,
-  MODEL_CACHE,
-  markerURL,
-  translationChunks,
-} from "./translation-models.mjs";
+import { models, MODEL_CACHE, markerURL } from "./translation-models.mjs";
+
+import { splitTranslationInput, translateUnits } from "./translation-text.mjs";
 
 let translator;
-self.onmessage = async ({ data: { source, text } }) => {
+self.onmessage = async ({ data: { source, text, style = "lines" } }) => {
   try {
     const { pipeline, env } = await import(
       "./vendor/transformers/transformers.min.js"
@@ -79,31 +76,48 @@ self.onmessage = async ({ data: { source, text } }) => {
         }
       }
     }
-    const lines = text.split("\n");
-    const result = Array(lines.length).fill("");
-    const repeated = new Map();
-    for (let index = 0; index < lines.length; index++) {
-      const line = lines[index];
-      if (line.trim()) {
-        if (!repeated.has(line)) {
-          const translated = [];
-          for (const chunk of translationChunks(line)) {
-            const output = await translator(chunk, { max_new_tokens: 256 });
-            if (!output?.[0]?.translation_text?.trim())
-              throw new Error("The model returned an empty line.");
-            translated.push(output[0].translation_text.trim());
-          }
-          repeated.set(line, translated.join(" "));
+    const tokenCount = (input) => translator.tokenizer.encode(input).length;
+    const generate = async (input, budget = 400) => {
+      const chunks = splitTranslationInput(input, tokenCount, budget, source);
+      const output = [];
+      for (const chunk of chunks) {
+        // The convenience pipeline always enables truncation. Use explicit inputs
+        // instead so long lyrics are never silently clipped at the encoder limit.
+        const inputs = translator.tokenizer(chunk, {
+          padding: true,
+          truncation: false,
+        });
+        const tokens = await translator.model.generate({
+          ...inputs,
+          max_new_tokens: 448,
+          do_sample: false,
+        });
+        if (tokens.dims[1] >= 449) {
+          // Do not cache a translation cut off by the decoder limit.
+          const smaller = Math.floor(tokenCount(chunk) / 2);
+          if (smaller < 8 || smaller >= budget)
+            throw new Error("The model could not finish this phrase.");
+          output.push(await generate(chunk, smaller));
+        } else {
+          const translated = translator.tokenizer
+            .batch_decode(tokens, { skip_special_tokens: true })[0]
+            ?.trim();
+          if (!translated)
+            throw new Error("The model returned an empty phrase.");
+          output.push(translated);
         }
-        result[index] = repeated.get(line);
       }
-      self.postMessage({
-        type: "line",
-        index,
-        text: result[index],
-        total: lines.length,
-      });
-    }
+      return output.join(" ");
+    };
+    const total = text.split("\n").length;
+    const result = await translateUnits(
+      text,
+      style,
+      generate,
+      (index, translated) => {
+        self.postMessage({ type: "line", index, text: translated, total });
+      },
+    );
     self.postMessage({ type: "complete", lines: result });
   } catch {
     self.postMessage({

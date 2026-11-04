@@ -30,25 +30,6 @@ export const markerURL = (source) =>
     import.meta.url,
   ).href;
 
-// Bound encoder inputs without dropping a long original row or changing alignment.
-export function translationChunks(line, limit = 200) {
-  const chunks = [];
-  let current = "";
-  for (const word of line.trim().split(/\s+/u)) {
-    if (!word) continue;
-    if (Array.from(current + " " + word).length <= limit) {
-      current = current ? `${current} ${word}` : word;
-      continue;
-    }
-    if (current) chunks.push(current);
-    const points = Array.from(word);
-    while (points.length > limit) chunks.push(points.splice(0, limit).join(""));
-    current = points.join("");
-  }
-  if (current) chunks.push(current);
-  return chunks;
-}
-
 export async function modelIsCached(source) {
   source = languageCode(source);
   if (!models[source] || !globalThis.caches) return false;

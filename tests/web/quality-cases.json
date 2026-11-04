@@ -1,0 +1,148 @@
+[
+  {
+    "source": "es",
+    "input": "No me di cuenta de que\nme estabas esperando.",
+    "previous": [
+      "I didn't realize that",
+      "You were waiting for me."
+    ],
+    "meaning": "I didn't realize you were waiting for me."
+  },
+  {
+    "source": "es",
+    "input": "Te echo de menos\ncuando cae la noche.",
+    "previous": [
+      "I miss you.",
+      "When the night falls."
+    ],
+    "meaning": "I miss you when night falls."
+  },
+  {
+    "source": "es",
+    "input": "Por mucho que lo intente,\nno consigo olvidarte.",
+    "previous": [
+      "As much as I try,",
+      "I can't forget you."
+    ],
+    "meaning": "As much as I try, I cannot forget you."
+  },
+  {
+    "source": "es",
+    "input": "Quiero que sepas\nque puedes contar conmigo.",
+    "previous": [
+      "I want you to know",
+      "I can count on you."
+    ],
+    "meaning": "I want you to know that you can count on me.",
+    "mustContain": [
+      "you can count on me"
+    ]
+  },
+  {
+    "source": "es",
+    "input": "Me haces falta\nmás de lo que crees.",
+    "previous": [
+      "I need you.",
+      "more than you think."
+    ],
+    "meaning": "I need you more than you think.",
+    "knownLimitation": "Joining context can omit the person being missed/needed; compare line-by-line output."
+  },
+  {
+    "source": "fr",
+    "input": "Tu me manques\nplus que je ne le pensais.",
+    "previous": [
+      "I miss you",
+      "More than I thought."
+    ],
+    "meaning": "I miss you more than I thought."
+  },
+  {
+    "source": "fr",
+    "input": "Je n’en peux plus\nde faire semblant.",
+    "previous": [
+      "I can't take it anymore.",
+      "To pretend."
+    ],
+    "meaning": "I cannot stand pretending anymore."
+  },
+  {
+    "source": "fr",
+    "input": "J’ai beau essayer,\nje n’arrive pas à t’oublier.",
+    "previous": [
+      "I'm trying,",
+      "I can't, can't, forget."
+    ],
+    "meaning": "No matter how I try, I cannot forget you.",
+    "knownLimitation": "This compact model still mistranslates the concessive French idiom avoir beau."
+  },
+  {
+    "source": "fr",
+    "input": "C’est toi qui\nme manques le plus.",
+    "previous": [
+      "You're the one who",
+      "I miss the most."
+    ],
+    "meaning": "You are the person I miss most."
+  },
+  {
+    "source": "fr",
+    "input": "Ne me laisse pas\ntomber quand tout va mal.",
+    "previous": [
+      "Don't leave me",
+      "Fall when everything goes wrong."
+    ],
+    "meaning": "Do not let me down when things go wrong.",
+    "mustContain": [
+      "don't let me down"
+    ]
+  },
+  {
+    "source": "ar",
+    "input": "لا يسعني إلا أن\nأفكر فيك كل ليلة.",
+    "previous": [
+      "I can't help but...",
+      "I think about you every night."
+    ],
+    "meaning": "I cannot help thinking about you every night.",
+    "mustContain": [
+      "can't help but think"
+    ]
+  },
+  {
+    "source": "ar",
+    "input": "مهما حاولت،\nلا أستطيع أن أنساك.",
+    "previous": [
+      "No matter how hard I try,",
+      "I can't forget you."
+    ],
+    "meaning": "No matter how hard I try, I cannot forget you."
+  },
+  {
+    "source": "ar",
+    "input": "قلبي مش قادر\nينسى اللي فات.",
+    "previous": [
+      "My heart can't.",
+      "Forget what's gone."
+    ],
+    "meaning": "My heart cannot forget the past."
+  },
+  {
+    "source": "ar",
+    "input": "اشتقت إليك\nأكثر مما تتصور.",
+    "previous": [
+      "I missed you.",
+      "More than you can imagine."
+    ],
+    "meaning": "I missed you more than you can imagine."
+  },
+  {
+    "source": "ar",
+    "input": "لم أعد أعرف\nكيف أعيش من دونك.",
+    "previous": [
+      "I don't know anymore.",
+      "How I live without you."
+    ],
+    "meaning": "I no longer know how to live without you."
+  }
+]

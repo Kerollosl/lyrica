@@ -4,9 +4,9 @@ import {
   modelIsCached,
   markerURL,
   supportsModel,
-  translationChunks,
 } from "../../web/translation-models.mjs";
 import {
+  translateLines,
   translationStatus,
   translateWithModel,
   detectLanguage,
@@ -23,17 +23,6 @@ test("only the requested model pairs are downloadable, including regional langua
     ["", "en"],
   ])
     assert.equal(supportsModel(source, target), false);
-});
-test("long multilingual rows are bounded without losing words or breaking Unicode", () => {
-  for (const text of [
-    "Bonjour ".repeat(300).trim(),
-    "مرحبا ".repeat(300).trim(),
-    "🎵".repeat(401),
-  ]) {
-    const chunks = translationChunks(text);
-    assert.ok(chunks.every((c) => Array.from(c).length <= 200));
-    assert.equal(chunks.join("").replace(/\s/g, ""), text.replace(/\s/g, ""));
-  }
 });
 test("language detection failures leave the source for the user to choose", async () => {
   globalThis.LanguageDetector = {
@@ -142,5 +131,32 @@ test("cache readiness requires every recorded model asset", async () => {
     assert.equal(await modelIsCached("es"), false);
   } finally {
     delete globalThis.caches;
+  }
+});
+
+test("native browser translation receives a connected phrase and releases its session", async () => {
+  const calls = [];
+  let destroyed = 0;
+  globalThis.Translator = {
+    create: async () => ({
+      translate: async (input) => {
+        calls.push(input);
+        return "I cannot stand pretending anymore.";
+      },
+      destroy: () => destroyed++,
+    }),
+  };
+  try {
+    const lines = await translateLines(
+      "Je n’en peux plus\nde faire semblant.",
+      "fr",
+      "en",
+      { signal: new AbortController().signal, style: "context" },
+    );
+    assert.deepEqual(calls, ["Je n'en peux plus de faire semblant."]);
+    assert.deepEqual(lines, ["I cannot stand pretending anymore.", ""]);
+    assert.equal(destroyed, 1);
+  } finally {
+    delete globalThis.Translator;
   }
 });

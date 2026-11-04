@@ -6,6 +6,7 @@ import {
   MODEL_CACHE,
   RUNTIME_CACHE,
 } from "./translation-models.mjs";
+import { translateUnits } from "./translation-text.mjs";
 export { models } from "./translation-models.mjs";
 
 let worker, workerSource;
@@ -69,7 +70,7 @@ export async function translationStatus(source, target) {
 export function translateWithModel(
   text,
   source,
-  { signal, progress = () => {}, onLine = () => {} },
+  { signal, progress = () => {}, onLine = () => {}, style = "lines" },
 ) {
   signal.throwIfAborted();
   source = languageCode(source);
@@ -145,7 +146,7 @@ export function translateWithModel(
       if (data.type === "error") fail(new Error(data.message));
     };
     watch();
-    current.postMessage({ source, text });
+    current.postMessage({ source, text, style });
   });
 }
 
@@ -153,10 +154,21 @@ export async function translateLines(
   text,
   source,
   target,
-  { signal, progress = () => {}, onLine = () => {}, engine = "native" },
+  {
+    signal,
+    progress = () => {},
+    onLine = () => {},
+    engine = "native",
+    style = "lines",
+  },
 ) {
   if (engine === "model")
-    return translateWithModel(text, source, { signal, progress, onLine });
+    return translateWithModel(text, source, {
+      signal,
+      progress,
+      onLine,
+      style,
+    });
   signal.throwIfAborted();
   const translator = await Translator.create({
     sourceLanguage: source,
@@ -172,18 +184,19 @@ export async function translateLines(
   const abort = () => translator.destroy();
   signal.addEventListener("abort", abort, { once: true });
   try {
-    const result = [],
-      lines = text.split("\n");
-    for (let i = 0; i < lines.length; i++) {
-      signal.throwIfAborted();
-      result.push(lines[i].trim() ? await translator.translate(lines[i]) : "");
-      signal.throwIfAborted();
-      onLine(i, result[i]);
-      progress(
-        `Translating on your device · ${Math.round(((i + 1) / lines.length) * 100)}%`,
-      );
-    }
-    return result;
+    const total = text.split("\n").length;
+    return await translateUnits(
+      text,
+      style,
+      (input) => translator.translate(input),
+      (index, translated) => {
+        onLine(index, translated);
+        progress(
+          `Translating on your device · ${Math.round(((index + 1) / total) * 100)}%`,
+        );
+      },
+      () => signal.throwIfAborted(),
+    );
   } finally {
     signal.removeEventListener("abort", abort);
     translator.destroy();

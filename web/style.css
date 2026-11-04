@@ -1938,3 +1938,25 @@ summary {
     padding-left: 0;
   }
 }
+
+/* Keep every original lyric break inside its translated phrase. */
+.context-row > span:first-child { white-space: pre-line; }
+.options-menu {
+  width: min(280px, calc(100vw - 40px));
+  min-width: min(235px, calc(100vw - 40px));
+  max-height: min(560px, calc(100dvh - 150px));
+  overflow-y: auto;
+}
+.options-menu select {
+  display: block;
+  width: calc(100% - 18px);
+  min-height: 44px;
+  margin: 4px 9px;
+}
+.options-menu > small {
+  display: block;
+  margin: 4px 9px 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}

@@ -1,3 +1,4 @@
+import { translationKey, translationUnits } from "./translation-text.mjs";
 import { icon } from "./icons.mjs";
 import {
   languages,
@@ -33,7 +34,13 @@ const state = {
   reader: null,
   libraryQuery: "",
   favorites: false,
-  settings: { target: "en", font: 21, theme: "system", cache: false },
+  settings: {
+    target: "en",
+    font: 21,
+    theme: "system",
+    cache: false,
+    translationStyle: "context",
+  },
   source: "",
   target: "en",
   lines: [],
@@ -42,6 +49,7 @@ const state = {
   modelDownload: false,
   selected: -1,
   stacked: false,
+  grouped: false,
 };
 let searchController,
   lyricsController,
@@ -194,16 +202,18 @@ function readerView() {
   const reader = state.reader;
   if (!reader) return "";
   const source = state.source || reader.document?.language || "";
-  return `<div class="reader-top"><button class="back-button" data-action="back">${icon("back")} ${readerOrigin === "library" ? "Library" : "Search"}</button><div class="reader-actions"><button class="favorite-button ${reader.favorite ? "is-saved" : ""}" data-action="favorite" aria-label="${reader.favorite ? "Saved; remove from favorites" : "Save favorite"}" aria-pressed="${Boolean(reader.favorite)}">${icon("heart", reader.favorite)}<span>${reader.favorite ? "Saved" : "Save"}</span></button><details class="reader-options"><summary aria-label="Reader options">${icon("settings")}<span>Reader options</span></summary><div class="options-menu"><span class="menu-label">Text size</span><div class="font-controls"><button class="icon-button" data-action="smaller" aria-label="Smaller lyrics">A−</button><span>${state.settings.font}px</span><button class="icon-button" data-action="larger" aria-label="Larger lyrics">A+</button></div><button data-action="layout" aria-label="Switch between columns and stacked layout" aria-pressed="${state.stacked}">${icon("layout")} ${state.stacked ? "Use columns" : "Stack translations"}</button><button data-action="manual-original">${icon("note")} Paste or replace lyrics</button><button data-action="manual-translation" ${!reader.document ? "disabled" : ""}>${icon("languages")} Paste a translation</button></div></details></div></div>
+  return `<div class="reader-top"><button class="back-button" data-action="back">${icon("back")} ${readerOrigin === "library" ? "Library" : "Search"}</button><div class="reader-actions"><button class="favorite-button ${reader.favorite ? "is-saved" : ""}" data-action="favorite" aria-label="${reader.favorite ? "Saved; remove from favorites" : "Save favorite"}" aria-pressed="${Boolean(reader.favorite)}">${icon("heart", reader.favorite)}<span>${reader.favorite ? "Saved" : "Save"}</span></button><details class="reader-options"><summary aria-label="Reader options">${icon("settings")}<span>Reader options</span></summary><div class="options-menu"><label class="menu-label" for="translation-style">Translation style</label><select id="translation-style"><option value="context" ${state.settings.translationStyle === "context" ? "selected" : ""}>In context</option><option value="lines" ${state.settings.translationStyle === "lines" ? "selected" : ""}>Line by line</option></select><small>Context keeps related lines together. Line by line keeps separate rows.</small><button data-action="retranslate" ${!reader.document ? "disabled" : ""}>${icon("languages")} Retranslate</button><span class="menu-label">Text size</span><div class="font-controls"><button class="icon-button" data-action="smaller" aria-label="Smaller lyrics">A−</button><span>${state.settings.font}px</span><button class="icon-button" data-action="larger" aria-label="Larger lyrics">A+</button></div><button data-action="layout" aria-label="Switch between columns and stacked layout" aria-pressed="${state.stacked}">${icon("layout")} ${state.stacked ? "Use columns" : "Stack translations"}</button><button data-action="manual-original">${icon("note")} Paste or replace lyrics</button><button data-action="manual-translation" ${!reader.document ? "disabled" : ""}>${icon("languages")} Paste a translation</button></div></details></div></div>
   <header class="reader-song">${cover(reader.song)}<div><h1>${e(reader.song.title)}</h1><p><strong>${e(reader.song.artist)}</strong><span aria-hidden="true"> · </span>${e(reader.song.album)}</p></div></header>
   <div class="language-bar"><div class="language-control"><label for="source-language">Original</label><select id="source-language"><option value="" ${!source ? "selected" : ""}>Detect / choose language</option>${options(source)}</select></div><div class="language-control"><label for="target-language">Translation</label><select id="target-language">${options(state.target)}</select></div></div><div id="translation-status" role="status">${translationNotice()}</div>
   ${
     reader.document
-      ? `<section class="bilingual-panel ${state.stacked ? "stacked" : ""}" aria-label="Bilingual lyrics"><p class="reader-guide">Original above · translation below</p><div id="lyric-lines">${reader.document.text
-          .split("\n")
-          .map((line, index) =>
+      ? `<section class="bilingual-panel ${state.stacked ? "stacked" : ""}" aria-label="Bilingual lyrics"><p class="reader-guide">Original above · translation below</p><div id="lyric-lines">${translationUnits(
+          reader.document.text,
+          state.grouped ? "context" : "lines",
+        )
+          .map(({ text: line, start: index }) =>
             line
-              ? `<button class="lyric-row" data-action="highlight" data-index="${index}" aria-pressed="${state.selected === index}"><span lang="${e(source || "und")}" dir="${rtl(source) ? "rtl" : "auto"}">${e(line)}</span><span class="translated" lang="${e(state.target)}" dir="${rtl(state.target) ? "rtl" : "auto"}">${e(state.lines[index] || "—")}</span></button>`
+              ? `<button class="lyric-row ${state.grouped ? "context-row" : ""}" data-action="highlight" data-index="${index}" aria-pressed="${state.selected === index}"><span lang="${e(source || "und")}" dir="${rtl(source) ? "rtl" : "auto"}">${e(line)}</span><span class="translated" lang="${e(state.target)}" dir="${rtl(state.target) ? "rtl" : "auto"}">${e(state.lines[index] || "—")}</span></button>`
               : '<div class="verse-space" aria-hidden="true"></div>',
           )
           .join("")}</div></section>`
@@ -224,7 +234,7 @@ function settingsView() {
   <section class="setting-section"><h2>${icon("text")} Reading</h2><div class="setting-row"><label for="default-language">Default translation language</label><select id="default-language">${options(state.settings.target)}</select></div><div class="setting-row"><label for="font-size">Lyrics text size <small id="font-value">${state.settings.font}px</small></label><input id="font-size" type="range" min="15" max="30" value="${state.settings.font}"></div></section>
   <section class="setting-section"><h2>${icon("settings")} Appearance</h2><div class="setting-row"><label for="theme">Color theme<small>Follow your device, or choose your own.</small></label><select id="theme">${["system", "light", "dark"].map((value) => `<option value="${value}" ${value === state.settings.theme ? "selected" : ""}>${value[0].toUpperCase() + value.slice(1)}</option>`).join("")}</select></div></section>
   <section class="setting-section"><h2>${icon("download")} Storage</h2><label class="setting-row cache-setting" for="cache"><span>Save permitted lyrics offline<small>Only save lyrics and translations you’re permitted to keep.</small></span><span class="switch-target"><input id="cache" type="checkbox" ${state.settings.cache ? "checked" : ""}></span></label><p>${state.songs.filter((song) => song.document).length} originals saved · ${state.songs.filter((song) => song.favorite).length} favorites. Stored on this browser, separate from your iPhone library.</p><div class="storage-buttons"><button class="plain" data-action="clear-models">Remove downloaded language models</button><button class="plain" data-action="clear-cache">Clear lyrics & translations</button><button class="plain" data-action="clear-recent">Clear recent searches</button><button class="plain danger" data-action="delete-all">Delete library & history</button></div></section>
-  <details class="setting-section about-details"><summary>About Lyrica & privacy</summary><div class="about-content"><p>Search and metadata come from Apple’s iTunes API. Lyrics come from LRCLIB. Availability does not grant copyright or redistribution rights. Only paste or store material you’re authorized to use.</p><p>Spanish, Arabic, and French → English can run privately in your browser using downloadable OPUS-MT models. Choose the original language, then download its model when prompted (about 110–120 MB per language, plus a shared 23 MB engine). Translation appears line by line. Speed and memory use depend on your phone. Models are reused while browser storage is retained; you can remove them below. Supported desktop browsers may use their built-in translator instead. Apple Translation is exclusive to the native iPhone app.</p><p>Queries go directly to Apple, and recording metadata goes directly to LRCLIB. Language models download from Hugging Face; your lyric text is processed locally and is not sent there. Lyrica has no analytics, accounts, server, paid API, or cloud sync. Only the application shell is cached automatically; lyric storage is opt-in. Clearing browser data removes your library. Browser-managed translation models are managed by the browser.</p><a class="plain" href="https://github.com/Kerollosl/lyrica" target="_blank" rel="noopener">Explore the iPhone app and source ${icon("external")}</a></div></details></div>`;
+  <details class="setting-section about-details"><summary>About Lyrica & privacy</summary><div class="about-content"><p>Search and metadata come from Apple’s iTunes API. Lyrics come from LRCLIB. Availability does not grant copyright or redistribution rights. Only paste or store material you’re authorized to use.</p><p>Spanish, Arabic, and French → English can run privately in your browser using downloadable OPUS-MT models. Choose the original language, then download its model when prompted (about 110–120 MB per language, plus a shared 23 MB engine). The default In context style translates related lines together to preserve meaning. Reader options lets you compare Line by line or retranslate older saved text. Compact models can still miss idioms, dialect and poetry. Speed and memory use depend on your phone. Models are reused while browser storage is retained; you can remove them below. Supported desktop browsers may use their built-in translator instead. Apple Translation is exclusive to the native iPhone app.</p><p>Queries go directly to Apple, and recording metadata goes directly to LRCLIB. Language models download from Hugging Face; your lyric text is processed locally and is not sent there. Lyrica has no analytics, accounts, server, paid API, or cloud sync. Only the application shell is cached automatically; lyric storage is opt-in. Clearing browser data removes your library. Browser-managed translation models are managed by the browser.</p><a class="plain" href="https://github.com/Kerollosl/lyrica" target="_blank" rel="noopener">Explore the iPhone app and source ${icon("external")}</a></div></details></div>`;
 }
 async function search() {
   searchController?.abort();
@@ -335,7 +345,7 @@ async function loadLyrics() {
     }
   }
 }
-async function prepare(userGesture = false) {
+async function prepare(userGesture = false, force = false) {
   translationController?.abort();
   const controller = new AbortController();
   translationController = controller;
@@ -343,6 +353,7 @@ async function prepare(userGesture = false) {
   state.lines = [];
   state.translating = false;
   state.modelDownload = false;
+  state.grouped = false;
   state.message = "";
   const reader = state.reader;
   if (!reader?.document) return;
@@ -356,14 +367,27 @@ async function prepare(userGesture = false) {
       state.source = detected;
     }
     if (token !== revision) return;
-    const key = `${state.source}:${state.target}`;
-    if (reader.translations[key]) {
-      state.lines = reader.translations[key];
+    const key = translationKey(
+      state.source,
+      state.target,
+      state.settings.translationStyle,
+    );
+    const legacyKey = `${state.source}:${state.target}`;
+    const cachedKey = reader.translations[key] ? key : legacyKey;
+    if (!force && reader.translations[cachedKey]) {
+      state.grouped =
+        cachedKey === key && state.settings.translationStyle === "context";
+      state.lines = reader.translations[cachedKey];
       state.message = reader.song.demo
         ? ""
         : state.settings.cache
           ? "Saved translation · Available offline."
           : "Translation from this session.";
+      if (state.grouped)
+        state.message += " Related original lines are shown together.";
+      else if (!reader.song.demo && cachedKey === legacyKey)
+        state.message +=
+          " Use Retranslate in Reader options to try the updated translator.";
       render();
       return;
     }
@@ -394,7 +418,11 @@ async function prepare(userGesture = false) {
         "A free language-model download is needed. Select “Translate on this device” to begin.";
     else {
       state.translating = true;
-      state.message = "Translating privately on your device…";
+      state.grouped = state.settings.translationStyle === "context";
+      state.selected = -1;
+      state.message = state.grouped
+        ? "Translating with context on your device… Related original lines are shown together."
+        : "Translating privately on your device…";
       render();
       const lines = await translateLines(
         reader.document.text,
@@ -402,6 +430,7 @@ async function prepare(userGesture = false) {
         state.target,
         {
           signal: controller.signal,
+          style: state.settings.translationStyle,
           engine: status.startsWith("model-") ? "model" : "native",
           onLine(index, text) {
             if (token !== revision) return;
@@ -423,7 +452,9 @@ async function prepare(userGesture = false) {
       if (token !== revision) return;
       state.lines = lines;
       reader.translations[key] = lines;
-      state.message = "Translated on your device.";
+      state.message = state.grouped
+        ? "Translated on your device. Related original lines are shown together for context."
+        : "Translated on your device.";
       await persist();
     }
   } catch (error) {
@@ -611,6 +642,16 @@ document.addEventListener("change", async (event) => {
   try {
     const id = event.target.id,
       value = event.target.value;
+    if (id === "translation-style") {
+      state.settings.translationStyle = value === "lines" ? "lines" : "context";
+      await saveSettings();
+      const key = translationKey(
+        state.source,
+        state.target,
+        state.settings.translationStyle,
+      );
+      await prepare(false, !state.reader?.translations[key]);
+    }
     if (id === "source-language") {
       state.source = value;
       await prepare();
@@ -697,7 +738,8 @@ document.addEventListener("click", async (event) => {
       state.message = "Translation stopped. You can retry when you’re ready.";
       render();
     }
-    if (action === "translate") await prepare(true);
+    if (action === "retranslate") await prepare(false, true);
+    if (action === "translate") await prepare(true, true);
     if (action === "favorites" || action === "history") {
       state.favorites = action === "favorites";
       render();
@@ -830,7 +872,14 @@ document.addEventListener("click", async (event) => {
           revision++;
           state.translating = false;
           state.lines = lines;
+          delete reader.translations[
+            translationKey(state.source, state.target, "context")
+          ];
+          delete reader.translations[
+            translationKey(state.source, state.target, "lines")
+          ];
           reader.translations[`${state.source}:${state.target}`] = lines;
+          state.grouped = false;
           state.message = "Translation supplied by you.";
           await persist();
           render();
@@ -852,6 +901,8 @@ async function boot() {
       ...state.settings,
       ...(await db.preference("settings")),
     };
+    state.settings.translationStyle =
+      state.settings.translationStyle === "lines" ? "lines" : "context";
     state.settings.font = Math.max(
       15,
       Math.min(30, Number(state.settings.font) || 21),

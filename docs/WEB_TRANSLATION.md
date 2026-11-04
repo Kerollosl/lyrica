@@ -17,12 +17,16 @@ Tokenizers/configuration add several MB. The shared vendored engine adds approxi
 1. Retrieve or paste permitted original lyrics and choose the source language if browser detection is unavailable.
 2. Keep English as the translation language. A cached model is reused; otherwise a supported browser-native translator is preferred.
 3. In browsers without native support, review the download notice and select **Download & translate**. Model downloads never start just from selecting a source or opening a song.
-4. Read translated rows as they finish. Verse breaks, source indices, independent Arabic RTL direction, wrapping, and highlights are preserved. Repeated lines are translated once per operation. Long lines are chunked and rejoined in the same row.
+4. New automatic translations default to **In context**: related lines are translated as a phrase and shown beside the complete original group, preserving its line breaks. Reader options offers **Line by line** and **Retranslate** for older saved results. Source indices, independent Arabic RTL direction, wrapping and highlights remain aligned. Long inputs are split by actual tokenizer budgets at sentence/clause/word boundaries; originals are never silently truncated.
 5. Cancel to stop work. Changing source/navigating away cancels active work. Only complete translations enter the song cache, and persistent lyric/translation storage still requires the existing permission setting.
 
 Model files are fetched from Hugging Face; no lyric text is included in those requests. Actual inference occurs inside a dedicated module Worker using single-threaded WASM. Only one model worker is retained. Cached models use `lyrica-translation-models-v1`; shared runtime files use `lyrica-translation-runtime-v1`. Model availability markers include the required cached asset keys, so a missing file invalidates the cached-ready status. Settings removes both caches without deleting saved translations.
 
 Offline inference requires previously downloaded model assets and engine, the installed app shell, and retained browser storage. Cache eviction/private browsing/low storage can require a new download. No cloud translation fallback is silently used. Other pairs retain manual translation and supported browser-native translation.
+
+## Accuracy update
+
+See the [quality review](WEB_TRANSLATION_QUALITY.md) for the 2026-11-04 context/punctuation/cache changes, real before/after examples, and known failures. Small local models still have accuracy limits, especially for dialects, idioms and poetry.
 
 ## Verification
 
