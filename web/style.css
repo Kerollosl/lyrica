@@ -395,6 +395,37 @@ kbd {
   margin-left: auto;
 }
 
+.artist-bar,
+.artist-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  margin: 4px 0 10px;
+}
+.artist-bar > span {
+  font-size: 0.8125rem;
+  color: var(--muted);
+}
+.artist-bar .chip small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.artist-bar .chip[aria-pressed="true"],
+.artist-actions .chip[aria-pressed="true"] {
+  font-weight: 600;
+  text-decoration: underline;
+}
+.chip[aria-pressed="true"] .icon {
+  color: var(--accent);
+}
+.favorite-artists {
+  margin-bottom: 28px;
+}
+.library-artists {
+  margin-top: 14px;
+}
+
 /* The example is a recording in the app, not a marketing panel. */
 .demo-feature {
   display: flex;

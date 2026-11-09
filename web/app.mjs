@@ -14,6 +14,7 @@ import {
   parseBackup,
 } from "./core.mjs";
 import { searchSongs, fetchLyrics } from "./services.mjs";
+import { artistsOf, byArtist, hasArtist, toggleArtist, sameArtist } from "./search.mjs";
 import * as db from "./store.mjs";
 import { models, modelIsCached } from "./translation-models.mjs";
 import {
@@ -36,6 +37,10 @@ const state = {
   error: "",
   songs: [],
   recent: [],
+  favoriteArtists: [],
+  artistSearch: false,
+  artistFilter: "",
+  libraryArtist: "",
   reader: null,
   libraryQuery: "",
   favorites: false,
@@ -67,6 +72,7 @@ let searchController,
   debounce,
   toastTimer,
   readerOrigin = "search",
+  pendingSearch = false,
   returnPoint = null,
   revision = 0;
 const options = (selected) =>
@@ -240,7 +246,7 @@ function searchView() {
   return `<header class="discover-heading"><h1>Search songs</h1><p>Find lyrics by song, artist, or album.</p></header>
   <section class="search-panel" aria-label="Find a song"><form id="search-form" role="search"><div class="search-box">${icon("search")}<input type="search" id="song-search" name="song" aria-label="Search songs or paste an Apple Music link" aria-describedby="search-hint" placeholder="Song, artist, or album" value="${e(state.query)}" autocomplete="off" spellcheck="false" enterkeyhint="search"><button class="search-submit" type="submit" aria-label="Search">Search ${icon("arrow")}</button></div></form><div class="search-help"><span id="search-hint">${icon("link")} Or paste an Apple Music song link</span><span>Press <kbd>/</kbd> to search</span></div>
   ${state.recent.length ? `<div class="recent"><span>Recent</span>${state.recent.map((query, index) => `<button class="chip" data-action="recent" data-index="${index}">${icon("clock")}${e(query)}</button>`).join("")}<button class="plain" data-action="clear-recent">Clear</button></div>` : ""}<div id="search-results">${searchResults()}</div></section>
-  <div id="discover" ${state.query.trim() ? "hidden" : ""}><section class="demo-feature" aria-labelledby="demo-title"><div class="demo-art" aria-hidden="true"></div><div class="demo-copy"><h2 id="demo-title">Try an example</h2><p>Read a Spanish verse with included translations.</p><button class="demo-action" data-action="demo">Open example ${icon("arrow")}</button></div></section>
+  <div id="discover" ${state.query.trim() ? "hidden" : ""}>${favoriteArtistChips()}<section class="demo-feature" aria-labelledby="demo-title"><div class="demo-art" aria-hidden="true"></div><div class="demo-copy"><h2 id="demo-title">Try an example</h2><p>Read a Spanish verse with included translations.</p><button class="demo-action" data-action="demo">Open example ${icon("arrow")}</button></div></section>
   ${recentSongs.length ? `<section class="recently-read"><div class="section-heading"><h2>Recently viewed</h2><a href="#library">Your library ${icon("arrow")}</a></div><div class="recent-cards">${recentSongs.map((record) => `<button class="collection-card" data-action="open-library" data-index="${e(record.id)}">${cover(record.song)}<strong>${e(record.song.title)}</strong><span>${e(record.song.artist)}</span>${record.document ? `<small>${icon("download")} Offline</small>` : ""}</button>`).join("")}</div></section>` : ""}</div>`;
 }
 function searchResults() {
@@ -249,7 +255,30 @@ function searchResults() {
   if (state.error)
     return `<div class="notice" role="alert">${e(state.error)} <button class="plain" data-action="retry-search">Try again</button></div>`;
   if (!state.searched) return "";
-  return `<div class="section-heading"><h2>Choose your recording</h2><span>${plural(state.results.length, "result")}</span></div>${state.results.length ? `<div class="result-list">${state.results.map((song, i) => songRow(song, i)).join("")}</div>` : `<div class="empty-state">${icon("search")}<h2>No songs found</h2><p>Try another title, artist, or Apple Music song link.</p></div>`}<p class="search-help">Check the album and duration for remixes, live versions, and re-recordings.</p>`;
+  const shown = state.artistFilter
+    ? byArtist(state.results, state.artistFilter)
+    : state.results;
+  const artists = artistsOf(state.results);
+  return `<div class="section-heading"><h2>${state.artistSearch ? e(state.query) : "Choose your recording"}</h2><span>${plural(shown.length, "result")}</span></div>${artistBar(artists)}${shown.length ? `<div class="result-list">${shown.map((song) => songRow(song, state.results.indexOf(song))).join("")}</div>` : `<div class="empty-state">${icon("search")}<h2>No songs found</h2><p>Try another title, artist, or Apple Music song link.</p></div>`}<p class="search-help">Check the album and duration for remixes, live versions, and re-recordings.</p>`;
+}
+/** Artist filter chips for the current results, with favorite and "more by" controls. */
+function artistBar(artists) {
+  if (!artists.length || (artists.length < 2 && !state.artistFilter)) return "";
+  const active = state.artistFilter;
+  const chips = artists
+    .map(
+      ({ name, count }) =>
+        `<button class="chip" data-action="filter-artist" data-artist="${e(name)}" aria-pressed="${sameArtist(name, active)}"${sameArtist(name, active) ? ' data-selected="true"' : ""}>${hasArtist(state.favoriteArtists, name) ? icon("heart", true) : ""}${e(name)} <small>${count}</small></button>`,
+    )
+    .join("");
+  const controls = active
+    ? `<div class="artist-actions"><button class="chip" data-action="favorite-artist" data-artist="${e(active)}" aria-pressed="${hasArtist(state.favoriteArtists, active)}">${icon("heart", hasArtist(state.favoriteArtists, active))}${hasArtist(state.favoriteArtists, active) ? "Favorite artist" : "Favorite this artist"}</button>${state.artistSearch ? "" : `<button class="chip" data-action="artist-search" data-artist="${e(active)}">${icon("search")}All songs by ${e(active)}</button>`}<button class="plain" data-action="filter-artist" data-artist="">Show all</button></div>`
+    : "";
+  return `<div class="artist-bar" role="group" aria-label="Filter by artist"><span>Artists</span>${chips}</div>${controls}`;
+}
+function favoriteArtistChips() {
+  if (!state.favoriteArtists.length) return "";
+  return `<section class="favorite-artists" aria-label="Favorite artists"><div class="section-heading"><h2>Favorite artists</h2></div><div class="artist-bar">${state.favoriteArtists.map((name) => `<button class="chip" data-action="artist-search" data-artist="${e(name)}">${icon("heart", true)}${e(name)}</button>`).join("")}</div></section>`;
 }
 /** Typing updates only the result region, so the caret and IME composition stay intact. */
 function updateSearchRegion() {
@@ -264,6 +293,7 @@ function libraryRecords() {
   const records = state.songs.filter(
     (record) =>
       (!state.favorites || record.favorite) &&
+      (!state.libraryArtist || sameArtist(record.song.artist, state.libraryArtist)) &&
       (!query ||
         `${record.song.title} ${record.song.artist} ${record.song.album}`
           .toLowerCase()
@@ -282,8 +312,15 @@ function libraryRecords() {
     )
     .join("");
 }
+function libraryArtists() {
+  const artists = artistsOf(state.songs.map((record) => record.song), 40);
+  if (!artists.length) return "";
+  const favorite = (name) => hasArtist(state.favoriteArtists, name);
+  artists.sort((a, b) => Number(favorite(b.name)) - Number(favorite(a.name)));
+  return `<div class="artist-bar library-artists" role="group" aria-label="Filter library by artist"><span>Artists</span>${artists.map(({ name, count }) => `<button class="chip" data-action="library-artist" data-artist="${e(name)}" aria-pressed="${sameArtist(name, state.libraryArtist)}"${sameArtist(name, state.libraryArtist) ? ' data-selected="true"' : ""}>${favorite(name) ? icon("heart", true) : ""}${e(name)} <small>${count}</small></button>`).join("")}</div>${state.libraryArtist ? `<div class="artist-actions"><button class="chip" data-action="favorite-artist" data-artist="${e(state.libraryArtist)}" aria-pressed="${favorite(state.libraryArtist)}">${icon("heart", favorite(state.libraryArtist))}${favorite(state.libraryArtist) ? "Favorite artist" : "Favorite this artist"}</button><button class="chip" data-action="artist-search" data-artist="${e(state.libraryArtist)}">${icon("search")}Find more songs</button><button class="plain" data-action="library-artist" data-artist="">Show all</button></div>` : ""}`;
+}
 function libraryView() {
-  return `<header class="page-head"><h1 class="page-title">Library</h1></header><div class="library-tools"><div class="segmented" role="group" aria-label="Library filter"><button data-action="history" aria-pressed="${!state.favorites}" class="${!state.favorites ? "selected" : ""}">${icon("clock")} Recently viewed</button><button data-action="favorites" aria-pressed="${state.favorites}" class="${state.favorites ? "selected" : ""}">${icon("heart")} Favorites</button></div><div class="library-search-wrap">${icon("search")}<input type="search" class="library-search" id="library-search" name="library-query" aria-label="Search your library" aria-controls="library-records" placeholder="Find a saved song" value="${e(state.libraryQuery)}"></div></div><div id="library-records" class="${state.favorites ? "favorite-grid" : "library-list"}">${libraryRecords()}</div><p class="storage-note">${icon("download")} Offline marks lyrics saved in this browser, along with languages you’ve already translated. Other songs keep just the song details.</p>`;
+  return `<header class="page-head"><h1 class="page-title">Library</h1></header><div class="library-tools"><div class="segmented" role="group" aria-label="Library filter"><button data-action="history" aria-pressed="${!state.favorites}" class="${!state.favorites ? "selected" : ""}">${icon("clock")} Recently viewed</button><button data-action="favorites" aria-pressed="${state.favorites}" class="${state.favorites ? "selected" : ""}">${icon("heart")} Favorites</button></div><div class="library-search-wrap">${icon("search")}<input type="search" class="library-search" id="library-search" name="library-query" aria-label="Search your library" aria-controls="library-records" placeholder="Find a saved song" value="${e(state.libraryQuery)}"></div></div><div id="library-artists">${libraryArtists()}</div><div id="library-records" class="${state.favorites ? "favorite-grid" : "library-list"}">${libraryRecords()}</div><p class="storage-note">${icon("download")} Offline marks lyrics saved in this browser, along with languages you’ve already translated. Other songs keep just the song details.</p>`;
 }
 
 function translatedCell(index) {
@@ -404,6 +441,7 @@ async function search() {
   state.results = [];
   state.error = "";
   state.searched = false;
+  state.artistFilter = "";
   if (!state.query) {
     state.busy = false;
     updateSearchRegion();
@@ -412,7 +450,9 @@ async function search() {
   state.busy = true;
   updateSearchRegion();
   try {
-    const results = await searchSongs(state.query, controller.signal);
+    const results = await searchSongs(state.query, controller.signal, {
+      artist: state.artistSearch,
+    });
     if (controller.signal.aborted) return;
     state.results = results;
     state.searched = true;
@@ -930,6 +970,11 @@ async function navigate(focus = false) {
     toast(error.message);
   }
   render();
+  if (pendingSearch && state.page === "search") {
+    pendingSearch = false;
+    search().catch((error) => toast(error.message));
+    return;
+  }
   if (fromReader && returnPoint?.page === state.page) {
     // Return to the same place in the list the song was opened from.
     const { y, action, index } = returnPoint;
@@ -969,12 +1014,14 @@ document.addEventListener("submit", (event) => {
   if (event.target.id === "search-form") {
     event.preventDefault();
     clearTimeout(debounce);
+    state.artistSearch = false;
     search().catch((error) => toast(error.message));
   }
 });
 document.addEventListener("input", (event) => {
   if (event.target.id === "song-search") {
     state.query = event.target.value;
+    state.artistSearch = false;
     // Wait for IME composition to finish before searching.
     if (event.isComposing) return;
     searchController?.abort();
@@ -1076,6 +1123,7 @@ async function exportLibrary() {
     version: 1,
     exportedAt: new Date().toISOString(),
     recent: state.recent,
+    favoriteArtists: state.favoriteArtists,
     songs,
   };
   const url = URL.createObjectURL(
@@ -1093,7 +1141,7 @@ async function exportLibrary() {
 async function importLibrary(file) {
   if (file.size > 20 * 1024 * 1024)
     throw new Error("That file is too large to be a Lyrica backup.");
-  const { records, withheld, recent } = parseBackup(await file.text(), {
+  const { records, withheld, recent, favoriteArtists } = parseBackup(await file.text(), {
     allowContent: state.settings.cache,
   });
   for (const record of records) {
@@ -1112,6 +1160,10 @@ async function importLibrary(file) {
   }
   state.recent = [...new Set([...state.recent, ...recent])].slice(0, 8);
   await db.setPreference("recent", state.recent);
+  for (const name of favoriteArtists)
+    if (!hasArtist(state.favoriteArtists, name))
+      state.favoriteArtists = toggleArtist(state.favoriteArtists, name);
+  await db.setPreference("favoriteArtists", state.favoriteArtists);
   await refreshSongs();
   render();
   toast(
@@ -1154,7 +1206,51 @@ document.addEventListener("click", async (event) => {
       if (history.state?.lyrica) history.back();
       else location.replace(`#${readerOrigin}`);
     }
+    if (
+      action === "filter-artist" ||
+      action === "library-artist" ||
+      action === "favorite-artist" ||
+      action === "artist-search"
+    ) {
+      const name = button.dataset.artist || "";
+      if (action === "filter-artist") {
+        state.artistFilter = sameArtist(state.artistFilter, name) ? "" : name;
+        updateSearchRegion();
+        document
+          .querySelector(`#search-results [data-action="filter-artist"][aria-pressed="true"]`)
+          ?.focus({ preventScroll: true });
+      }
+      if (action === "library-artist") {
+        state.libraryArtist = sameArtist(state.libraryArtist, name) ? "" : name;
+        document.querySelector("#library-artists").innerHTML = libraryArtists();
+        document.querySelector("#library-records").innerHTML = libraryRecords();
+      }
+      if (action === "favorite-artist") {
+        state.favoriteArtists = toggleArtist(state.favoriteArtists, name);
+        await db.setPreference("favoriteArtists", state.favoriteArtists);
+        if (state.page === "library")
+          document.querySelector("#library-artists").innerHTML = libraryArtists();
+        else updateSearchRegion();
+        toast(
+          hasArtist(state.favoriteArtists, name)
+            ? `${name} added to favorite artists`
+            : `${name} removed from favorite artists`,
+        );
+      }
+      if (action === "artist-search") {
+        state.query = name;
+        state.artistSearch = true;
+        if (state.page === "search") {
+          render();
+          await search();
+        } else {
+          pendingSearch = true;
+          location.hash = "#search";
+        }
+      }
+    }
     if (action === "recent") {
+      state.artistSearch = false;
       state.query = state.recent[Number(button.dataset.index)];
       render();
       await search();
@@ -1324,7 +1420,9 @@ document.addEventListener("click", async (event) => {
           else {
             await db.clearSongs();
             state.recent = [];
+            state.favoriteArtists = [];
             await db.setPreference("recent", []);
+            await db.setPreference("favoriteArtists", []);
           }
           await refreshSongs();
           state.reader = null;
@@ -1494,6 +1592,7 @@ async function boot() {
       Math.min(30, Number(state.settings.font) || 21),
     );
     state.recent = (await db.preference("recent")) || [];
+    state.favoriteArtists = (await db.preference("favoriteArtists")) || [];
     applySettings();
     if (!db.storage.persistent)
       toast(

@@ -136,6 +136,15 @@ export function parseBackup(json, { allowContent = false } = {}) {
   return {
     records,
     withheld,
+    favoriteArtists: Array.isArray(data.favoriteArtists)
+      ? [
+          ...new Set(
+            data.favoriteArtists.filter(
+              (name) => typeof name === "string" && name.trim(),
+            ),
+          ),
+        ].slice(0, 500)
+      : [],
     recent: Array.isArray(data.recent)
       ? data.recent.filter((query) => typeof query === "string").slice(0, 8)
       : [],

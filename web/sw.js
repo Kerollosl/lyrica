@@ -1,4 +1,4 @@
-const CACHE = "lyrica-shell-v7";
+const CACHE = "lyrica-shell-v8";
 const RUNTIME = "lyrica-translation-runtime-v1";
 const SHELL = [
   "./",
@@ -9,6 +9,7 @@ const SHELL = [
   "./core.mjs",
   "./services.mjs",
   "./store.mjs",
+  "./search.mjs",
   "./translation.mjs",
   "./translation-models.mjs",
   "./translation-worker.mjs",

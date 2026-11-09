@@ -4,6 +4,13 @@ import {
   documentFrom,
   matchRecording,
 } from "./core.mjs";
+import {
+  rankSongs,
+  simplifyQuery,
+  splitQuery,
+  byArtist,
+  uniqueSongs,
+} from "./search.mjs";
 const nextRequest = new Map();
 const abortError = () => new DOMException("Request cancelled", "AbortError");
 async function pace(host, interval, signal) {
@@ -84,36 +91,57 @@ function songFrom(track) {
     appleMusicURL: track.trackViewUrl,
   };
 }
-export async function searchSongs(query, signal) {
-  const link = /^https?:\/\//i.test(query);
-  const reference = link ? appleReference(query) : null;
-  const params = new URLSearchParams(
-    reference
-      ? { id: reference.id, country: reference.country, entity: "song" }
-      : {
-          term: query,
-          entity: "song",
-          media: "music",
-          limit: 40,
-          country: "US",
-        },
-  );
+const catalog = async (params, signal) => {
   const data = await get(
-    `https://itunes.apple.com/${reference ? "lookup" : "search"}?${params}`,
+    `https://itunes.apple.com/search?${new URLSearchParams(params)}`,
     signal,
   );
-  const songs = [
-    ...new Map(
-      (data?.results || [])
-        .filter((track) => track.kind === "song")
-        .map((track) => [track.trackId, songFrom(track)]),
-    ).values(),
-  ];
-  if (reference && !songs.length)
-    throw new Error(
-      "This song isn’t available in that storefront. Try searching by title and artist.",
+  return (data?.results || [])
+    .filter((track) => track.kind === "song")
+    .map(songFrom);
+};
+/**
+ * Search Apple's catalog. With `artist: true` the text is matched against artist
+ * names only, so a name returns that artist's songs rather than title matches.
+ */
+export async function searchSongs(query, signal, { artist = false } = {}) {
+  if (/^https?:\/\//i.test(query)) {
+    const reference = appleReference(query);
+    const data = await get(
+      `https://itunes.apple.com/lookup?${new URLSearchParams({ id: reference.id, country: reference.country, entity: "song" })}`,
+      signal,
     );
-  return songs;
+    const songs = uniqueSongs(
+      (data?.results || []).filter((track) => track.kind === "song").map(songFrom),
+    );
+    if (!songs.length)
+      throw new Error(
+        "This song isn\u2019t available in that storefront. Try searching by title and artist.",
+      );
+    return songs;
+  }
+  const base = { entity: "song", media: "music", limit: 200, country: "US" };
+  if (artist) {
+    const songs = uniqueSongs(
+      await catalog({ ...base, term: query, attribute: "artistTerm" }, signal),
+    );
+    const exact = byArtist(songs, query);
+    return rankSongs(exact.length ? exact : songs, query);
+  }
+  let songs = uniqueSongs(await catalog({ ...base, term: query }, signal));
+  // Too few hits: retry with a cleaned-up query so stray words don't hide the song.
+  if (songs.length < 5) {
+    const simple = simplifyQuery(query);
+    const { title, artist: by } = splitQuery(simple);
+    const retries = [simple, title && by ? `${title} ${by}` : ""].filter(
+      (term, i, all) => term && term !== query && all.indexOf(term) === i,
+    );
+    for (const term of retries) {
+      songs = uniqueSongs([...songs, ...(await catalog({ ...base, term }, signal))]);
+      if (songs.length >= 5) break;
+    }
+  }
+  return rankSongs(songs, query);
 }
 export async function fetchLyrics(song, signal) {
   const params = new URLSearchParams({
