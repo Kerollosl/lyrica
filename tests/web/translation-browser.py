@@ -1,4 +1,5 @@
 """Deterministic mobile UI checks. Actual model inference is checked by models.py."""
+import re
 import sys
 from playwright.sync_api import sync_playwright,expect
 from support import launch,visit,navigate,original_api_fixtures,assert_no_overflow
@@ -56,7 +57,9 @@ with sync_playwright() as p:
  page.get_by_role('button',name='Download & translate',exact=True).click()
  page.get_by_role('button',name='Cancel',exact=True).click()
  expect(page.locator('#translation-status')).to_contain_text('Translation stopped')
- expect(page.locator('.translated').first).to_have_text('—')
+ # Without a translation the reader shows the original alone, not placeholder dashes.
+ expect(page.locator('.bilingual-panel')).to_have_class(re.compile('original-only'))
+ expect(page.locator('.translated').first).to_have_text('')
  navigate(page,'settings')
  page.get_by_role('button',name='Remove downloaded language models').click()
  page.get_by_role('button',name='Remove models',exact=True).click()

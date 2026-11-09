@@ -67,7 +67,7 @@ struct SettingsView: View {
                 LabeledContent {
                     Text("\(songs.filter { $0.document != nil }.count)").monospacedDigit()
                 } label: {
-                    Text("Saved originals")
+                    Text("Songs saved offline")
                 }
                 LabeledContent {
                     Text("\(translations.count)").monospacedDigit()
@@ -140,10 +140,9 @@ struct SettingsView: View {
         if enabled {
             showsPermission = true
         } else {
-            do {
-                try store.clearCachedContent()
-                settings.cacheLyrics = false
-            } catch { self.error = error.localizedDescription }
+            // Turning storage off deletes saved lyrics, so it asks first. Until
+            // confirmed, the toggle stays on.
+            confirmation = .disableOffline
         }
     }
 
@@ -153,6 +152,7 @@ struct SettingsView: View {
             case .cache: try store.clearCachedContent()
             case .searches: try store.clearRecentSearches()
             case .all: try store.deleteAll(); settings.cacheLyrics = false
+            case .disableOffline: try store.clearCachedContent(); settings.cacheLyrics = false
             case nil: break
             }
         } catch { self.error = error.localizedDescription }
@@ -161,21 +161,29 @@ struct SettingsView: View {
 }
 
 private enum StorageAction {
-    case cache, searches, all
+    case cache, searches, all, disableOffline
 
     var title: String {
         switch self {
         case .cache: "Clear downloaded content?"
         case .searches: "Clear recent searches?"
         case .all: "Delete all local data?"
+        case .disableOffline: "Turn off offline lyrics?"
         }
     }
-    var button: String { self == .all ? "Delete all data" : "Clear" }
+    var button: String {
+        switch self {
+        case .all: "Delete all data"
+        case .disableOffline: "Turn off and remove lyrics"
+        default: "Clear"
+        }
+    }
     var message: String {
         switch self {
         case .cache: "Removes saved originals and translations. Your favorite bookmarks and viewing history remain."
         case .searches: "Removes recent search terms. Your library remains."
         case .all: "Removes favorites, viewing history, search history, lyrics, and translations. This cannot be undone."
+        case .disableOffline: "Saved lyrics and translations will be removed from this iPhone. Favorites and viewing history stay."
         }
     }
 }

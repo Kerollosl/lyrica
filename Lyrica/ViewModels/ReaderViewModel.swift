@@ -35,11 +35,33 @@ final class ReaderViewModel {
     private var generation = UUID()
     private var loadGeneration = UUID()
     private var memoryTranslations: [String: [String]] = [:]
+    private let bundled: BundledTranslations?
 
-    init(song: Song, provider: any LyricsProviding = LRCLIBClient()) {
+    /// Authored translations that ship with a document, such as Lyrica's example.
+    struct BundledTranslations {
+        let document: LyricDocument
+        let source: String
+        let byTarget: [String: [String]]
+    }
+
+    init(song: Song, provider: any LyricsProviding = LRCLIBClient(), bundled: BundledTranslations? = nil) {
         self.song = song
         self.provider = provider
+        self.bundled = bundled
+        if let bundled { sourceOverride = bundled.source }
     }
+
+    /// The reader for a song, using the included example content when it is Lyrica's demo.
+    static func make(for song: Song) -> ReaderViewModel {
+        guard DemoContent.isDemo(song) else { return ReaderViewModel(song: song) }
+        return ReaderViewModel(
+            song: song,
+            provider: DemoLyricsProvider(),
+            bundled: BundledTranslations(document: DemoContent.document, source: DemoContent.sourceLanguage, byTarget: DemoContent.translations)
+        )
+    }
+
+    var isDemo: Bool { DemoContent.isDemo(song) }
 
     var sourceLanguage: String? {
         sourceOverride == "auto" ? detectedLanguage : sourceOverride
@@ -103,6 +125,10 @@ final class ReaderViewModel {
         let source = sourceLanguage
         let target = targetLanguage
         let key = LibraryStore.translationKey(document: document, target: target, source: source)
+        if let bundled, bundled.document == document, bundled.source == source, let lines = bundled.byTarget[target] {
+            translated = lines
+            return
+        }
         if let cached = memoryTranslations[key] { translated = cached; return }
         do {
             if let cached = try store.translation(for: document, targetLanguage: target, sourceLanguage: source) {

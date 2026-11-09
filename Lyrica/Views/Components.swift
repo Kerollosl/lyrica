@@ -15,23 +15,73 @@ enum LyricaStyle {
 struct ArtworkView: View {
     let url: URL?
     var size: CGFloat = 60
+    var demo = false
+
+    init(url: URL?, size: CGFloat = 60, demo: Bool = false) {
+        self.url = url
+        self.size = size
+        self.demo = demo
+    }
+
+    init(song: Song, size: CGFloat = 60) {
+        self.init(url: song.artworkURL, size: size, demo: DemoContent.isDemo(song))
+    }
 
     var body: some View {
-        AsyncImage(url: url) { phase in
-            if let image = phase.image {
-                image.resizable().scaledToFill()
+        Group {
+            if demo {
+                DemoArtwork()
             } else {
-                ZStack {
-                    Color(uiColor: .secondarySystemFill)
-                    Image(systemName: "music.note")
-                        .font(.system(size: size * 0.28))
-                        .foregroundStyle(.secondary)
+                AsyncImage(url: url) { phase in
+                    if let image = phase.image {
+                        image.resizable().scaledToFill()
+                    } else {
+                        ZStack {
+                            Color(uiColor: .secondarySystemFill)
+                            Image(systemName: "music.note")
+                                .font(.system(size: size * 0.28))
+                                .foregroundStyle(.secondary)
+                        }
+                    }
                 }
             }
         }
         .frame(width: size, height: size)
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .accessibilityHidden(true)
+    }
+}
+
+/// The example's original artwork: a sun over a hill, matching the web companion.
+private struct DemoArtwork: View {
+    var body: some View {
+        GeometryReader { geometry in
+            let side = geometry.size.width
+            ZStack {
+                Color(red: 0.612, green: 0.667, blue: 0.549)
+                Circle()
+                    .fill(Color(red: 0.957, green: 0.843, blue: 0.643))
+                    .frame(width: side * 0.4, height: side * 0.4)
+                    .position(x: side * 0.66, y: side * 0.33)
+                HillShape()
+                    .fill(Color(red: 0.239, green: 0.353, blue: 0.282))
+                    .frame(width: side * 1.4, height: side * 0.65)
+                    .rotationEffect(.degrees(-18))
+                    .position(x: side * 0.58, y: side * 0.815)
+            }
+            .frame(width: side, height: side)
+            .clipped()
+        }
+    }
+}
+
+/// A dome: an elliptical top over a flat base.
+private struct HillShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.addEllipse(in: rect)
+        path.addRect(CGRect(x: rect.minX, y: rect.midY, width: rect.width, height: rect.height / 2))
+        return path
     }
 }
 
@@ -42,7 +92,7 @@ struct SongRow: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            ArtworkView(url: song.artworkURL, size: dynamicType.isAccessibilitySize ? 64 : 58)
+            ArtworkView(song: song, size: dynamicType.isAccessibilitySize ? 64 : 58)
             VStack(alignment: .leading, spacing: 5) {
                 Text(song.title).font(.body).foregroundStyle(LyricaStyle.ink)
                     .fixedSize(horizontal: false, vertical: true)
@@ -56,7 +106,7 @@ struct SongRow: View {
                     Image(systemName: "arrow.down.circle.fill")
                         .foregroundStyle(LyricaStyle.accent)
                         .accessibilityLabel("Lyrics saved offline")
-                } else {
+                } else if song.duration > 0 {
                     Text(Duration.seconds(song.duration).formatted(.time(pattern: .minuteSecond)))
                         .font(.caption.monospacedDigit()).foregroundStyle(LyricaStyle.secondary)
                 }
@@ -70,7 +120,7 @@ struct SongRow: View {
 
 struct SavedBadge: View {
     var body: some View {
-        Label("Saved offline", systemImage: "arrow.down.circle.fill")
+        Label("Offline", systemImage: "arrow.down.circle.fill")
             .font(.caption2)
             .foregroundStyle(.secondary)
             .accessibilityLabel("Lyrics saved offline")

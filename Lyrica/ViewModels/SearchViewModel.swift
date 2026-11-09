@@ -18,15 +18,24 @@ final class SearchViewModel {
         let request = UUID()
         generation = request
         let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        results = []
-        error = nil
-        hasSearched = false
-        guard !term.isEmpty else { isLoading = false; return }
-        isLoading = true
+        guard !term.isEmpty else {
+            results = []
+            error = nil
+            hasSearched = false
+            isLoading = false
+            return
+        }
         defer { if generation == request { isLoading = false } }
         do {
+            // Keep the previous results on screen while typing; replace them only
+            // once the debounce settles, so the list doesn't flicker per keystroke.
             if !immediately { try await Task.sleep(for: .milliseconds(350)) }
             try Task.checkCancellation()
+            guard generation == request else { return }
+            results = []
+            error = nil
+            hasSearched = false
+            isLoading = true
             let songs: [Song]
             if term.lowercased().hasPrefix("https://") || term.lowercased().hasPrefix("http://") {
                 guard let url = URL(string: term) else { throw LyricaError.invalidAppleMusicURL }

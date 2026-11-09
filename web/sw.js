@@ -1,4 +1,5 @@
-const CACHE = "lyrica-shell-v6";
+const CACHE = "lyrica-shell-v7";
+const RUNTIME = "lyrica-translation-runtime-v1";
 const SHELL = [
   "./",
   "./index.html",
@@ -13,10 +14,18 @@ const SHELL = [
   "./translation-worker.mjs",
   "./translation-text.mjs",
   "./icon.png",
+  "./icon-192.png",
   "./manifest.webmanifest",
 ];
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
+  // Bypass the HTTP cache so a new version never precaches stale files.
+  event.waitUntil(
+    caches
+      .open(CACHE)
+      .then((cache) =>
+        cache.addAll(SHELL.map((path) => new Request(path, { cache: "reload" }))),
+      ),
+  );
   self.skipWaiting();
 });
 self.addEventListener("activate", (event) => {
@@ -26,7 +35,11 @@ self.addEventListener("activate", (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter((key) => key.startsWith("lyrica-shell-") && key !== CACHE)
+            .filter(
+              (key) =>
+                (key.startsWith("lyrica-shell-") && key !== CACHE) ||
+                (key.startsWith("lyrica-translation-runtime-") && key !== RUNTIME),
+            )
             .map((key) => caches.delete(key)),
         ),
       )
@@ -42,7 +55,7 @@ self.addEventListener("fetch", (event) => {
   // Cache the large runtime only after a translation download is explicitly requested.
   if (new URL(event.request.url).pathname.includes("/vendor/transformers/")) {
     event.respondWith(
-      caches.open("lyrica-translation-runtime-v1").then(async (cache) => {
+      caches.open(RUNTIME).then(async (cache) => {
         const saved = await cache.match(event.request);
         if (saved) return saved;
         const response = await fetch(event.request);
@@ -54,6 +67,39 @@ self.addEventListener("fetch", (event) => {
           }
         }
         return response;
+      }),
+    );
+    return;
+  }
+  // Opening the app (including with a query string or a #song link) prefers a
+  // fresh shell, but falls back to the cached one when offline or slow.
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      new Promise((resolve) => {
+        let settled = false;
+        const fallback = () =>
+          caches
+            .match("./index.html", { ignoreSearch: true })
+            .then((cached) => cached || fetch(event.request));
+        const timer = setTimeout(() => {
+          if (!settled) {
+            settled = true;
+            resolve(fallback());
+          }
+        }, 3000);
+        fetch(event.request)
+          .then((response) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            resolve(response.ok ? response : fallback());
+          })
+          .catch(() => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            resolve(fallback());
+          });
       }),
     );
     return;

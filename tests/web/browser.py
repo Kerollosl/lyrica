@@ -3,7 +3,10 @@
 External APIs are deterministic mocks with original, authored text. Browser model
 availability and translation quality still need real-device acceptance testing.
 """
+import json
 import re
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from urllib.parse import parse_qs, urlparse
 
 from playwright.sync_api import sync_playwright, expect
@@ -57,12 +60,12 @@ def test_reading_and_storage(browser):
     expect(page.get_by_text(DEMO_FIRST_TRANSLATION, exact=True)).to_be_visible()
 
     # A bookmark can be saved while declining lyric storage.
-    page.get_by_role("button", name="Save favorite", exact=True).click()
+    page.get_by_role("button", name="Favorite", exact=True).click()
     expect(page.locator("dialog")).to_be_visible()
     page.get_by_role("button", name="Keep bookmark only", exact=True).click()
     navigate(page, "library")
     expect(page.locator('[data-action="open-library"]', has_text=DEMO_TITLE)).to_be_visible()
-    assert page.locator(".song-duration", has_text="Saved").count() == 0
+    assert page.locator(".song-duration", has_text="Offline").count() == 0
     page.reload()
     page.wait_for_load_state("networkidle")
     expect(page.locator('[data-action="open-library"]', has_text=DEMO_TITLE)).to_be_visible()
@@ -76,7 +79,7 @@ def test_reading_and_storage(browser):
     page.locator('[data-action="open-library"]').first.click()
     expect(page.get_by_text(DEMO_FIRST_TRANSLATION, exact=True)).to_be_visible()
     navigate(page, "library")
-    expect(page.locator(".song-duration", has_text="Saved")).to_be_visible()
+    expect(page.locator(".song-duration", has_text="Offline")).to_be_visible()
     page.locator('[data-action="favorites"]').click()
     expect(page.locator('.favorite-grid .song-duration.is-offline')).to_be_visible()
     page.locator('[data-action="history"]').click()
@@ -109,9 +112,12 @@ def test_reading_and_storage(browser):
     expect(page.locator("dialog")).not_to_be_visible()
 
     set_theme(page, "dark")
-    page.locator("#cache").uncheck()
+    # Turning storage off asks first, because it deletes saved lyrics.
+    page.locator("#cache").click()
+    page.get_by_role("button", name="Turn off and remove lyrics", exact=True).click()
+    expect(page.locator("#cache")).not_to_be_checked()
     navigate(page, "library")
-    assert page.locator(".song-duration", has_text="Saved").count() == 0
+    assert page.locator(".song-duration", has_text="Offline").count() == 0
     page.locator("#library-search").fill("Definitely no match")
     expect(page.locator('[data-action="open-library"]')).to_have_count(0)
     page.locator("#library-search").fill("")
@@ -251,7 +257,13 @@ def test_viewports(browser):
             row_metrics = page.locator(".lyric-row").first.evaluate("row => ({height: row.getBoundingClientRect().height, text: row.innerText, size: getComputedStyle(row).fontSize})")
             assert row_metrics["height"] > 100, f"Long-text wrapping failed at {width} {theme}: {row_metrics}"
             options = reader_options(page)
-            options.get_by_role("button", name="Switch between columns and stacked layout").click()
+            layout_toggle = options.get_by_role("button", name="Switch between columns and stacked layout")
+            if width < 600:
+                # Phones always stack, so the toggle would do nothing there.
+                expect(layout_toggle).to_be_hidden()
+                page.keyboard.press("Escape")
+            else:
+                layout_toggle.click()
             assert_no_overflow(page, f"stacked reader {width} {theme}")
             navigate(page, "library")
             assert_no_overflow(page, f"library {width} {theme}")
@@ -487,6 +499,244 @@ def test_offline_shell(browser):
     print("PASS offline: service-worker shell and authored bilingual demo")
 
 
+# Song routing, study mode, keyboard reading, storage safety, backup and resilience.
+DEMO_ROUTE = "#song/lyrica-original-demo"
+
+
+def new_page(browser, **options):
+    context = browser.new_context(service_workers="block", **options)
+    page = context.new_page()
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    page.route("https://itunes.apple.com/**", lambda route: route.abort())
+    page.route("https://lrclib.net/**", lambda route: route.abort())
+    return context, page, errors
+
+
+def test_routing(browser):
+    context, page, errors = new_page(browser, viewport={"width": 1280, "height": 900})
+    visit(page)
+    open_demo(page)
+    assert page.evaluate("location.hash") == DEMO_ROUTE
+    # Refresh keeps the song open.
+    page.reload()
+    expect(page.get_by_role("heading", name=DEMO_TITLE)).to_be_visible()
+    expect(page.get_by_text(DEMO_FIRST_TRANSLATION, exact=True)).to_be_visible()
+    # Browser Back returns to Search inside the app; Forward reopens the song.
+    page.go_back()
+    expect(page.get_by_role("heading", name="Search songs")).to_be_visible()
+    page.go_forward()
+    expect(page.get_by_role("heading", name=DEMO_TITLE)).to_be_visible()
+    # The reader's Back control returns to where the song was opened.
+    navigate(page, "library")
+    page.locator('[data-action="open-library"]').first.click()
+    expect(page.get_by_role("button", name="Library", exact=True)).to_be_visible()
+    page.get_by_role("button", name="Library", exact=True).click()
+    expect(page.get_by_role("heading", name="Library", exact=True)).to_be_visible()
+    expect(page.locator('[data-action="open-library"]').first).to_be_focused()
+    # A link to a song that isn't saved and isn't an Apple ID falls back to Search.
+    page.goto(f"{BASE_URL}/#song/not-a-song")
+    expect(page.get_by_role("heading", name="Search songs")).to_be_visible()
+    expect(page.locator("#toast")).to_contain_text("isn’t in this browser’s library")
+    assert not errors, errors
+    context.close()
+    print("PASS routing: song URLs, refresh, browser Back/Forward, reader Back focus, unknown links")
+
+
+def test_reading_controls(browser):
+    context, page, errors = new_page(browser, viewport={"width": 1280, "height": 900})
+    context.grant_permissions(["clipboard-read", "clipboard-write"], origin=BASE_URL)
+    visit(page)
+    open_demo(page)
+    rows = page.locator(".lyric-row")
+    # One Tab stop for the lyrics; arrow keys move the highlighted line.
+    expect(page.locator('.lyric-row[tabindex="0"]')).to_have_count(1)
+    rows.first.focus()
+    page.keyboard.press("ArrowDown")
+    expect(rows.nth(1)).to_be_focused()
+    expect(rows.nth(1)).to_have_attribute("aria-pressed", "true")
+    page.keyboard.press("End")
+    expect(rows.last).to_be_focused()
+    page.keyboard.press("Escape")
+    expect(page.locator('.lyric-row[aria-pressed="true"]')).to_have_count(0)
+
+    # Selecting text to copy a phrase doesn't toggle the highlight.
+    page.evaluate("""() => {
+      const span = document.querySelector('.lyric-row span');
+      const range = document.createRange();
+      range.setStart(span.firstChild, 0);
+      range.setEnd(span.firstChild, 4);
+      getSelection().removeAllRanges();
+      getSelection().addRange(range);
+      span.closest('.lyric-row').click();
+    }""")
+    expect(rows.first).to_have_attribute("aria-pressed", "false")
+    page.evaluate("getSelection().removeAllRanges()")
+
+    # Copy lyrics pairs each original line with its translation.
+    reader_options(page).get_by_role("button", name="Copy lyrics & translation").click()
+    expect(page.locator("#toast")).to_contain_text("copied")
+    copied = page.evaluate("navigator.clipboard.readText()")
+    assert "Abro la ventana al día\nI open the window to the day" in copied, copied
+    assert copied.rstrip().endswith(f"{DEMO_TITLE} · Lyrica Studio"), copied
+
+    # Study mode hides translations until a line is tapped.
+    reader_options(page).get_by_role("button", name="Hide translations").click()
+    expect(page.locator(".translated.concealed")).to_have_count(rows.count())
+    expect(page.get_by_text(DEMO_FIRST_TRANSLATION, exact=True)).to_be_hidden()
+    rows.first.click()
+    expect(rows.first.locator(".translated")).to_have_text(DEMO_FIRST_TRANSLATION)
+    expect(page.locator(".translated.concealed")).to_have_count(rows.count() - 1)
+    # The preference persists, and Settings offers the same switch.
+    page.reload()
+    expect(page.locator(".translated.concealed").first).to_be_attached()
+    navigate(page, "settings")
+    expect(page.locator("#study")).to_be_checked()
+    assert not errors, errors
+    context.close()
+    print("PASS reading controls: roving focus, arrow keys, selectable text, copy, study mode and its setting")
+
+
+def test_storage_safety(browser):
+    context, page, errors = new_page(browser, viewport={"width": 1280, "height": 900})
+    visit(page)
+    open_demo(page)
+    # Offline storage is offered once, on the first favorite.
+    favorite = page.get_by_role("button", name="Favorite", exact=True)
+    favorite.click()
+    page.get_by_role("button", name="Keep bookmark only", exact=True).click()
+    expect(favorite).to_have_attribute("aria-pressed", "true")
+    favorite.click()
+    expect(favorite).to_have_attribute("aria-pressed", "false")
+    favorite.click()
+    expect(page.locator("dialog")).not_to_be_visible()
+    expect(page.locator("#toast")).to_contain_text("Added to favorites")
+
+    # Turning offline storage off asks first; declining keeps it on.
+    navigate(page, "settings")
+    page.locator("#cache").click()
+    page.get_by_role("button", name="Enable permitted offline storage").click()
+    expect(page.locator("#cache")).to_be_checked()
+    page.locator("#cache").click()
+    expect(page.locator("dialog")).to_contain_text("Turn off offline reading?")
+    page.get_by_role("button", name="Keep offline lyrics", exact=True).click()
+    expect(page.locator("#cache")).to_be_checked()
+
+    # Unfavoriting from the grid can be undone.
+    navigate(page, "library")
+    page.get_by_role("button", name="Favorites", exact=True).click()
+    page.get_by_role("button", name=f"Remove {DEMO_TITLE} from favorites").click()
+    expect(page.locator(".favorite-grid .empty-state")).to_be_visible()
+    page.locator("#toast").get_by_role("button", name="Undo").click()
+    expect(page.locator('.favorite-grid [data-action="open-library"]')).to_have_count(1)
+    assert not errors, errors
+    context.close()
+    print("PASS storage safety: storage offered once, confirmation before deleting lyrics, undo unfavorite")
+
+
+def test_backup(browser):
+    context, page, errors = new_page(browser, viewport={"width": 1280, "height": 900}, accept_downloads=True)
+    visit(page)
+    open_demo(page)
+    page.get_by_role("button", name="Favorite", exact=True).click()
+    page.get_by_role("button", name="Enable permitted offline storage").click()
+    navigate(page, "settings")
+    with page.expect_download() as download_info:
+        page.get_by_role("button", name="Export library backup").click()
+    with TemporaryDirectory() as folder:
+        path = Path(folder) / "backup.json"
+        download_info.value.save_as(path)
+        data = json.loads(path.read_text())
+        assert data["app"] == "lyrica-web" and len(data["songs"]) == 1, data
+        page.get_by_role("button", name="Delete library & history", exact=True).click()
+        page.get_by_role("button", name="Delete library", exact=True).click()
+        expect(page.locator(".storage-summary")).to_contain_text("0 favorites")
+        page.locator("#import-file").set_input_files(str(path))
+        expect(page.locator("#toast")).to_contain_text("Imported 1 song")
+        expect(page.locator(".storage-summary")).to_contain_text("1 song saved offline · 1 favorite.")
+        # A file that isn't a backup is rejected with a clear message.
+        bogus = Path(folder) / "other.json"
+        bogus.write_text('{"hello": "world"}')
+        page.locator("#import-file").set_input_files(str(bogus))
+        expect(page.locator("#toast")).to_contain_text("isn’t a Lyrica library backup")
+    assert not errors, errors
+    context.close()
+    print("PASS backup: export, delete, import restores favorites and permitted lyrics, invalid files rejected")
+
+
+def test_resilience(browser):
+    # Storage blocked: Lyrica keeps working for the session.
+    context, page, errors = new_page(browser, viewport={"width": 390, "height": 844})
+    page.add_init_script("""
+      Object.defineProperty(window, 'indexedDB', { configurable: true, get() {
+        return { open() { throw new DOMException('blocked', 'SecurityError'); } };
+      }});
+    """)
+    visit(page)
+    expect(page.locator("#toast")).to_contain_text("blocking storage")
+    open_demo(page)
+    navigate(page, "library")
+    expect(page.locator('[data-action="open-library"]', has_text=DEMO_TITLE)).to_be_visible()
+    assert not errors, errors
+    context.close()
+
+    # Typing in Search keeps the caret where the reader put it.
+    context = browser.new_context(service_workers="block", viewport={"width": 1280, "height": 900})
+    page = context.new_page()
+    original_api_fixtures(page)
+    visit(page)
+    field = page.locator("#song-search")
+    field.fill("Test Artist")
+    expect(page.get_by_role("heading", name="Choose your recording")).to_be_visible()
+    field.press("Home")
+    for _ in range(4):
+        field.press("ArrowRight")
+    field.type("X")
+    page.wait_for_timeout(700)
+    expect(field).to_have_value("TestX Artist")
+    assert field.evaluate("el => el.selectionStart") == 5
+    # Arrow keys move from the field into the results (iTunes requests are paced).
+    expect(page.locator('[data-action="open-result"]').first).to_be_visible(timeout=10000)
+    field.focus()
+    field.press("ArrowDown")
+    expect(page.locator('[data-action="open-result"]').first).to_be_focused()
+    context.close()
+    print("PASS resilience: session storage fallback, stable caret while searching, arrow keys into results")
+
+
+def test_fewer_steps(browser):
+    context = browser.new_context(service_workers="block", viewport={"width": 390, "height": 844})
+    page = context.new_page()
+    original_api_fixtures(page)
+    visit(page)
+    # Pasting an Apple Music link goes straight to the reader.
+    page.get_by_role("searchbox").fill("https://music.apple.com/us/song/a-test-song/123")
+    page.get_by_role("button", name="Search", exact=True).click()
+    expect(page.get_by_role("heading", name="A test song")).to_be_visible()
+    expect(page.get_by_text("Hola mundo", exact=True)).to_be_visible()
+    # Without a browser language detector the source is guessed from the words,
+    # so no "choose the language" step. (Playwright's Chromium has no detector.)
+    page.evaluate("() => {}")
+    context.close()
+
+    context = browser.new_context(service_workers="block", viewport={"width": 390, "height": 844})
+    page = context.new_page()
+    original_api_fixtures(page)
+    page.route("https://lrclib.net/api/**", lambda route: route.fulfill(json={
+        "id": 2, "trackName": "A test song", "artistName": "Test Artist", "albumName": "Test Album",
+        "duration": 180, "instrumental": False,
+        "plainLyrics": "Abro la ventana al día\ny la luz me viene a encontrar\n\nCada calle guarda una historia\ncada voz un nuevo lugar",
+    }))
+    visit(page)
+    page.get_by_role("searchbox").fill("Test Artist")
+    page.get_by_role("button", name="Search", exact=True).click()
+    page.get_by_role("button", name=re.compile("A test song")).click()
+    expect(page.locator("#source-language")).to_have_value("es", timeout=10000)
+    expect(page.locator("#translation-status")).not_to_contain_text("couldn’t tell which language")
+    context.close()
+    print("PASS fewer steps: pasted link opens the reader, language guessed without a browser detector")
+
+
 if __name__ == "__main__":
     with sync_playwright() as playwright:
         browser = launch(playwright)
@@ -499,6 +749,12 @@ if __name__ == "__main__":
             test_reader_refinement(browser)
             test_theme_and_cache_target(browser)
             test_offline_shell(browser)
+            test_routing(browser)
+            test_reading_controls(browser)
+            test_storage_safety(browser)
+            test_backup(browser)
+            test_resilience(browser)
+            test_fewer_steps(browser)
         finally:
             browser.close()
     print(f"All browser checks passed against {BASE_URL}.")

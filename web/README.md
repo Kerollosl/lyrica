@@ -32,9 +32,11 @@ Manual translations require one translated line per nonblank original line. Vers
 
 ## Storage and offline reading
 
-IndexedDB stores metadata bookmarks, favorites, recent searches, and preferences on this browser. Original lyrics and translations are saved only after permitted-cache opt-in. Turning caching off clears existing content, retaining metadata. The app shell is cached by a service worker after the first online visit; API responses are never cached by the service worker, and API fetches use `cache: no-store`. Reopen saved songs through Library for offline reading. Artwork may be unavailable offline.
+IndexedDB stores metadata bookmarks, favorites, recent searches, and preferences on this browser. Original lyrics and translations are saved only after permitted-cache opt-in. The first favorite offers that opt-in once; later favorites are simply bookmarks. Turning caching off asks for confirmation, then clears existing content while retaining metadata. If the browser blocks IndexedDB (some private modes), Lyrica keeps working with session-only storage and says so. The app shell is cached by a service worker after the first online visit; API responses are never cached by the service worker, and API fetches use `cache: no-store`. Reopen saved songs through Library for offline reading. Artwork may be unavailable offline.
 
-The web and iOS libraries are separate. There is no authentication or cloud sync. Browser storage can be cleared or evicted by the browser; it is not a backup. Remove individual songs or clear all library/history data in Settings. Browser language models are managed separately by the browser.
+The web and iOS libraries are separate. There is no authentication or cloud sync. Browser storage can be cleared or evicted by the browser, so Settings can **export a library backup** (a JSON file) and import it again in any browser. Imports merge with the existing library and only bring in lyric text when offline storage is enabled. Remove individual songs or clear all library/history data in Settings. Browser language models are managed separately by the browser.
+
+Every song has its own address (`#song/<id>`), so refresh keeps it open, browser Back returns to the list it came from, and Share or Copy link gives a link that opens the same recording elsewhere (its details are looked up from Apple; lyrics are retrieved again).
 
 ## Tests
 
@@ -48,7 +50,7 @@ python3 tests/web/context-browser.py
 python3 tests/web/models.py
 ```
 
-Domain tests cover URL validation, recording matching/ambiguity, timestamps, line alignment, escaping, opt-in storage, and demo consistency. Browser tests mock external API responses to deterministically exercise search, retrieval, manual translation, highlights, RTL, cached language switching, favorites, persistence, deletion of cached content, dark mode, and mobile overflow. Real iTunes and LRCLIB endpoints were separately checked for CORS support. Real model downloads are not simulated as proof of translation availability.
+Domain tests cover URL validation, recording matching/ambiguity, timestamps, line alignment, escaping, opt-in storage, and demo consistency. Browser tests mock external API responses to deterministically exercise search, retrieval, manual translation, highlights, RTL, cached language switching, favorites, persistence, deletion of cached content, dark mode, and mobile overflow. `browser.py` also covers song URLs (refresh, Back/Forward, unknown links), keyboard line navigation, selectable lyric text, copying, Hide translations, the one-time storage offer, confirmation before deleting lyrics, Undo, backup export/import, session-only storage, and caret stability while searching. Real iTunes and LRCLIB endpoints were separately checked for CORS support. Real model downloads are not simulated as proof of translation availability.
 
 ## Free hosting
 
@@ -64,7 +66,7 @@ Lyrics and translations remain subject to their owners' rights. API access is no
 
 ## Interface and visual review
 
-The interface uses system fonts, neutral light/dark surfaces, blue actions, compact controls, and flat rows with separators. Navigation moves from a plain header to a phone tab bar. Local SVG icons need no external service. The reader retains paired rows, independent RTL direction, keyboard focus, adjustable text, and a manual stacked layout. Reader options group text size, layout, and manual lyrics/translation entry. Favorites distinguish permitted offline content from metadata bookmarks.
+The interface uses system fonts, neutral light/dark surfaces, blue actions, compact controls, and flat rows with separators. Navigation moves from a plain header to a phone tab bar. Local SVG icons need no external service. The reader retains paired rows, independent RTL direction, keyboard focus, adjustable text, and a manual stacked layout. Lyric text is selectable; clicking a line highlights the pair, arrow keys (or J/K) move between lines, and Ctrl/⌘-C copies the focused pair. **Hide translations** turns the reader into a study aid: translations stay covered until a line is tapped. Reader options group Display (text size, layout, Hide translations), Translation (style, retranslate, paste), and Lyrics (copy, copy link, paste or replace). Favorites distinguish permitted offline content from metadata bookmarks.
 
 See the [shared design system](../docs/DESIGN.md), [real screenshot matrix](../docs/web/screenshots/), and [updated MP4](../docs/lyrica-walkthrough.mp4). To regenerate the 24-screen matrix with a local server running:
 

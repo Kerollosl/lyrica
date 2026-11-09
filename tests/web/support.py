@@ -88,7 +88,7 @@ def open_demo(page):
 def save_permitted_demo(page):
     """Populate history through the real UI, using only the app's original demo."""
     open_demo(page)
-    page.get_by_role("button", name="Save favorite", exact=True).click()
+    page.get_by_role("button", name="Favorite", exact=True).click()
     page.get_by_role("button", name="Enable permitted offline storage").click()
     page.locator("dialog").wait_for(state="hidden")
 

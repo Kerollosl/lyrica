@@ -34,17 +34,19 @@ The web and iOS apps use system fonts, neutral light/dark backgrounds, blue cont
 
 The older illustrated concepts in `docs/previews/` are historical design studies. The screenshots above are captured from the current running app; original demo lyrics are labeled, and no screenshot demonstrates a model download.
 
-These light/dark iPhone Search captures are from an earlier successful simulator run. The latest native builds and tests pass, but the optional screenshot export timed out before producing fresh images:
+These iPhone captures come from the current build on an iPhone 17 simulator. The example song ships with its own translations, so the reader is shown fully translated even though Apple Translation needs a physical device:
 
-<p><img src="docs/ios/search-light.png" width="26%" alt="Lyrica iPhone Search in light mode" /> <img src="docs/ios/search-dark.png" width="26%" alt="Lyrica iPhone Search in dark mode" /></p>
+<p><img src="docs/ios/search-light.png" width="24%" alt="Lyrica iPhone Search in light mode with the example song" /> <img src="docs/ios/reader-light.png" width="24%" alt="Lyrica iPhone bilingual reader in light mode" /> <img src="docs/ios/search-dark.png" width="24%" alt="Lyrica iPhone Search in dark mode" /> <img src="docs/ios/reader-dark.png" width="24%" alt="Lyrica iPhone bilingual reader in dark mode" /></p>
 
 ## What it does
 
 - **Find the right song:** debounced iTunes search by song, artist, or album, artwork and recording metadata, recent searches, and Apple Music song-link lookup. Album links that contain an `i=` song ID work too; album-only links ask for a song.
 - **Retrieve lyrics responsibly:** LRCLIB metadata matching uses artist, title, album, and duration. Plain lyrics take priority; timestamped lyrics are cleaned without flattening verses. Uncertain matches and instrumental recordings have explicit states. You can paste lyrics you have permission to use when a match is unavailable.
 - **Translate locally:** Apple’s Translation framework translates individual nonblank lines while retaining row identifiers and stanza breaks. English is the initial target. The picker uses languages supported by the device, including Spanish, French, Italian, Portuguese, Arabic when available, and others. Language detection can be corrected manually.
-- **Read comfortably:** one scrolling surface keeps both columns aligned, with wrapping, paired line highlighting, an optional stacked layout, adjustable text size, Dynamic Type, VoiceOver labels, and right-to-left text direction per language.
-- **Keep a personal library:** favorites, searchable viewing history, opt-in local lyric and translation caching, offline reading of stored content, and controls to remove cached or all app data.
+- **Read comfortably:** one scrolling surface keeps both columns aligned, with wrapping, paired line highlighting, an optional stacked layout, adjustable text size, Dynamic Type, VoiceOver labels that use each language’s voice, and right-to-left text direction per language. Long-press any line to copy a phrase, look up a word, or translate it with the system.
+- **Study:** Hide translations keeps each translation covered until you tap its line. Copy the lyrics with their translation, or share the song’s Apple Music link.
+- **Try it immediately:** an original bilingual example song with included translations opens from Search, with no network or language download needed.
+- **Keep a personal library:** favorites, searchable viewing history, opt-in local lyric and translation caching (offered once, on your first favorite), offline reading of stored content, and controls to remove cached or all app data. Turning offline storage off asks before deleting saved lyrics. The web version adds song links, Undo, and library backup export/import.
 - **Make it yours:** default translation language, text size, system/light/dark appearance, and storage management.
 
 ## Install and run

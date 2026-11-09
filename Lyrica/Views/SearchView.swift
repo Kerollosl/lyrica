@@ -9,6 +9,7 @@ struct SearchView: View {
     @Query(sort: \StoredSong.lastViewed, order: .reverse) private var viewed: [StoredSong]
     @State private var model = SearchViewModel()
     @State private var storageError: String?
+    @State private var opensExample = LaunchOptions.opensExample
 
     private var isQueryEmpty: Bool { model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     private var artworkSize: CGFloat { dynamicType.isAccessibilitySize ? 160 : 104 }
@@ -55,7 +56,8 @@ struct SearchView: View {
         }
         .listStyle(.insetGrouped)
         .scrollDismissesKeyboard(.interactively)
-        .navigationTitle("Lyrica")
+        .navigationTitle("Search")
+        .navigationDestination(isPresented: $opensExample) { ReaderView(song: DemoContent.song) }
         .searchable(text: $model.query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Song, artist, album, or Apple Music link")
         .autocorrectionDisabled()
         .task(id: model.query) { await model.search() }
@@ -73,6 +75,23 @@ struct SearchView: View {
                 .padding(.vertical, 4)
         }
         .listRowBackground(Color.clear)
+
+        Section {
+            NavigationLink { ReaderView(song: DemoContent.song) } label: {
+                HStack(spacing: 14) {
+                    ArtworkView(song: DemoContent.song, size: dynamicType.isAccessibilitySize ? 64 : 58)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Try an example").font(.body.weight(.semibold)).foregroundStyle(.primary)
+                        Text("Read a Spanish verse with included translations.")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(.vertical, 4)
+                .accessibilityElement(children: .combine)
+                .accessibilityHint("Opens an original bilingual example")
+            }
+        }
 
         if !viewed.isEmpty {
             Section("Recently viewed") {
@@ -115,7 +134,7 @@ struct SearchView: View {
 
     private func recentCard(_ record: StoredSong) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            ArtworkView(url: record.song.artworkURL, size: artworkSize)
+            ArtworkView(song: record.song, size: artworkSize)
             Text(record.song.title)
                 .font(.system(.subheadline)).foregroundStyle(.primary)
                 .lineLimit(dynamicType.isAccessibilitySize ? nil : 2)

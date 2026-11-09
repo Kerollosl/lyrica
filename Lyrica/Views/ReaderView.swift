@@ -16,9 +16,12 @@ struct ReaderView: View {
     @State private var showsPermission = false
     @State private var layout = ReaderLayout.automatic
     @State private var retry = 0
+    @State private var revealed: Set<Int> = []
+    @State private var copied = false
     @ScaledMetric(relativeTo: .body) private var scaledSize: CGFloat = 18
+    @ScaledMetric(relativeTo: .body) private var verseGap: CGFloat = 22
 
-    init(song: Song) { _model = State(initialValue: ReaderViewModel(song: song)) }
+    init(song: Song) { _model = State(initialValue: ReaderViewModel.make(for: song)) }
 
     private var store: LibraryStore { LibraryStore(context: context) }
     private var translationIdentity: String {
@@ -29,7 +32,8 @@ struct ReaderView: View {
         GeometryReader { geometry in
             let stacked = layout == .stacked || (layout == .automatic && (geometry.size.width < 375 || dynamicType.isAccessibilitySize))
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
+                // At accessibility sizes the stacked pickers would cover too much of the screen.
+                LazyVStack(alignment: .leading, spacing: 0, pinnedViews: dynamicType.isAccessibilitySize ? [] : [.sectionHeaders]) {
                     songHeader
                         .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 16)
                     Section {
@@ -46,9 +50,19 @@ struct ReaderView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
+                if let url = model.song.appleMusicURL {
+                    ShareLink(item: url, subject: Text(model.song.title), message: Text("\(model.song.title) · \(model.song.artist)")) {
+                        Image(systemName: "square.and.arrow.up").frame(minWidth: 44, minHeight: 44)
+                    }
+                    .accessibilityLabel("Share song link")
+                }
                 Button {
                     model.toggleFavorite(store: store)
-                    if model.isFavorite && !settings.cacheLyrics { showsPermission = true }
+                    // Offer offline storage once. Afterwards a favorite is simply a bookmark.
+                    if model.isFavorite && !settings.cacheLyrics && !settings.offeredOfflineStorage {
+                        settings.offeredOfflineStorage = true
+                        showsPermission = true
+                    }
                 } label: {
                     Image(systemName: model.isFavorite ? "heart.fill" : "heart")
                         .frame(minWidth: 44, minHeight: 44)
@@ -62,7 +76,10 @@ struct ReaderView: View {
             }
         }
         .task { await model.load(store: store, settings: settings) }
-        .task(id: translationIdentity) { await model.prepareTranslation(store: store, settings: settings) }
+        .task(id: translationIdentity) {
+            revealed = []
+            await model.prepareTranslation(store: store, settings: settings)
+        }
         .background {
             if let request = model.request {
                 TranslationWorker(request: request) { session in
@@ -80,8 +97,8 @@ struct ReaderView: View {
         }) { options }
         .alert("Keep lyrics for offline reading?", isPresented: $showsPermission) {
             Button("Enable offline reading") { settings.cacheLyrics = true; model.persistCurrent(store: store) }
-            Button("Save bookmark only", role: .cancel) { }
-        } message: { Text("Only save lyrics and translations you’re permitted to keep. This enables local caching for future songs too. Your favorite is already bookmarked.") }
+            Button("Keep bookmark only", role: .cancel) { }
+        } message: { Text("Only save lyrics and translations you’re permitted to keep. This enables local caching for future songs too. Your favorite is already bookmarked, and you can change this later in Settings.") }
         .alert("Storage issue", isPresented: Binding(get: { model.storageError != nil }, set: { if !$0 { model.storageError = nil } })) {
             Button("OK") { model.storageError = nil }
         } message: { Text(model.storageError ?? "") }
@@ -132,8 +149,8 @@ struct ReaderView: View {
             }
             VStack(alignment: .leading, spacing: 12) {
                 Divider().padding(.bottom, 8)
-                Text(document.attribution)
-                if document.source == .lrclib {
+                Text(model.isDemo ? DemoContent.attribution : document.attribution)
+                if document.source == .lrclib && !model.isDemo {
                     Link("Lyrics from LRCLIB", destination: URL(string: "https://lrclib.net")!)
                         .frame(minHeight: 44, alignment: .leading)
                 }
@@ -159,7 +176,7 @@ struct ReaderView: View {
 
     private var songHeader: some View {
         HStack(alignment: .center, spacing: 16) {
-            ArtworkView(url: model.song.artworkURL, size: 64)
+            ArtworkView(song: model.song, size: 64)
             VStack(alignment: .leading, spacing: 5) {
                 Text(model.song.title).font(.headline).foregroundStyle(LyricaStyle.ink)
                     .fixedSize(horizontal: false, vertical: true)
@@ -176,38 +193,74 @@ struct ReaderView: View {
         let index = line.index
         let original = line.text
         let selected = model.presentation.selectedLineID == line.id
-        let translation = model.translated.indices.contains(index) ? model.translated[index] : nil
+        let translation = model.translated.indices.contains(index) ? model.translated[index] : ""
+        let hasTranslation = !translation.isEmpty
+        let concealed = settings.hideTranslations && hasTranslation && !selected && !revealed.contains(index)
         return Group {
-            if original.isEmpty { Color.clear.frame(height: 24).accessibilityHidden(true) }
-            else {
-                Button {
-                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) { model.toggleLine(line.id) }
-                } label: {
-                    Group {
-                        if stacked {
-                            VStack(alignment: .leading, spacing: 7) {
-                                lyricText(original, language: model.sourceLanguage, translated: false)
-                                lyricText(translation ?? "—", language: model.targetLanguage, translated: true)
-                            }
-                        } else {
-                            HStack(alignment: .top, spacing: 24) {
-                                lyricText(original, language: model.sourceLanguage, translated: false)
-                                lyricText(translation ?? "—", language: model.targetLanguage, translated: true)
-                            }
-                            .environment(\.layoutDirection, .leftToRight)
+            if original.isEmpty {
+                // Verse breaks scale with the reading size so stanzas stay distinct at large text.
+                Color.clear.frame(height: verseGap * settings.fontSize / 18).accessibilityHidden(true)
+            } else {
+                Group {
+                    if stacked {
+                        VStack(alignment: .leading, spacing: 6) {
+                            lyricText(original, language: model.sourceLanguage, translated: false)
+                            if hasTranslation { translationText(translation, concealed: concealed) }
                         }
+                    } else {
+                        HStack(alignment: .top, spacing: 24) {
+                            lyricText(original, language: model.sourceLanguage, translated: false)
+                            // Keep the original in its column while translations arrive.
+                            if hasTranslation { translationText(translation, concealed: concealed) }
+                            else { Color.clear.frame(maxWidth: .infinity, maxHeight: 1) }
+                        }
+                        .environment(\.layoutDirection, .leftToRight)
                     }
-                    .padding(.vertical, 10).padding(.horizontal, 10)
-                    .frame(minHeight: 44)
-                    .background(selected ? LyricaStyle.accent.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: 6))
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(original + ". " + (translation ?? "Translation pending"))
-                .accessibilityHint("Highlights the original and translation")
-                .accessibilityAddTraits(selected ? .isSelected : [])
+                .padding(.vertical, 8).padding(.horizontal, 10)
+                .frame(minHeight: 44)
+                .background(selected ? LyricaStyle.accent.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: 6))
+                .contentShape(Rectangle())
+                // A tap highlights the pair; a long press still selects text for Copy, Look Up and Translate.
+                .onTapGesture { toggle(line) }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(spokenLabel(original: original, translation: translation, concealed: concealed))
+                .accessibilityHint(settings.hideTranslations ? "Reveals and highlights the translation" : "Highlights the original and translation")
+                .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+                .accessibilityAction { toggle(line) }
             }
         }
+    }
+
+    /// VoiceOver reads each part in its own language rather than the device voice.
+    private func spokenLabel(original: String, translation: String, concealed: Bool) -> Text {
+        var label = AttributedString(original)
+        if let source = model.sourceLanguage { label.languageIdentifier = source }
+        var rest: AttributedString
+        if translation.isEmpty {
+            rest = AttributedString(". Translation pending")
+        } else if concealed {
+            rest = AttributedString(". Translation hidden")
+        } else {
+            rest = AttributedString(". " + translation)
+            rest.languageIdentifier = model.targetLanguage
+        }
+        return Text(label + rest)
+    }
+
+    private func toggle(_ line: ReaderLine) {
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
+            if settings.hideTranslations {
+                if revealed.contains(line.index) { revealed.remove(line.index) } else { revealed.insert(line.index) }
+            }
+            model.toggleLine(line.id)
+        }
+    }
+
+    private func translationText(_ text: String, concealed: Bool) -> some View {
+        lyricText(text, language: model.targetLanguage, translated: true)
+            .redacted(reason: concealed ? .placeholder : [])
+            .accessibilityHidden(concealed)
     }
 
     private func lyricText(_ text: String, language: String?, translated: Bool) -> some View {
@@ -216,6 +269,7 @@ struct ReaderView: View {
             .font(.system(size: scaledSize * settings.fontSize / 18, weight: .regular))
             .foregroundStyle(translated ? LyricaStyle.secondary : LyricaStyle.ink)
             .lineSpacing(5)
+            .textSelection(.enabled)
             .multilineTextAlignment(.leading)
             .frame(maxWidth: .infinity, alignment: .leading)
             .fixedSize(horizontal: false, vertical: true)
@@ -279,6 +333,17 @@ struct ReaderView: View {
         .contentShape(Rectangle())
     }
 
+    /// Original lines paired with their translations, separated by verse.
+    private var copyText: String {
+        guard let document = model.document else { return "" }
+        let lines = document.lines.enumerated().map { index, line -> String in
+            guard !line.isEmpty else { return "" }
+            let translation = model.translated.indices.contains(index) ? model.translated[index] : ""
+            return translation.isEmpty || translation == line ? line : line + "\n" + translation
+        }
+        return lines.joined(separator: "\n") + "\n\n" + model.song.title + " · " + model.song.artist
+    }
+
     private var options: some View {
         @Bindable var settings = settings
         return NavigationStack {
@@ -290,6 +355,13 @@ struct ReaderView: View {
                         .accessibilityLabel("Lyrics text size")
                         .accessibilityValue("\(Int(settings.fontSize)) points")
                 }
+                Section {
+                    Toggle("Hide translations", isOn: $settings.hideTranslations)
+                } header: {
+                    Text("Study")
+                } footer: {
+                    Text("Read the original first, then tap a line to reveal its translation.")
+                }
                 Section("Original language") {
                     Picker("Language", selection: $model.sourceOverride) {
                         Text("Detect automatically").tag("auto")
@@ -298,9 +370,18 @@ struct ReaderView: View {
                     Text("If detection gets a short or multilingual song wrong, choose its main language.").font(.footnote).foregroundStyle(.secondary)
                 }
                 Section {
-                    Button("Paste or replace lyrics") { manualAfterOptions = true; showsOptions = false }
+                    if model.document != nil {
+                        Button(copied ? "Copied" : "Copy lyrics and translation", systemImage: copied ? "checkmark" : "doc.on.doc") {
+                            UIPasteboard.general.string = copyText
+                            copied = true
+                        }
+                    }
+                    Button("Paste or replace lyrics", systemImage: "text.badge.plus") { manualAfterOptions = true; showsOptions = false }
+                } footer: {
+                    Text("Long-press any line to copy a phrase or look up a word.")
                 }
             }
+            .onAppear { copied = false }
             .navigationTitle("Reader options").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { showsOptions = false } } }
         }.presentationDetents([.medium, .large])

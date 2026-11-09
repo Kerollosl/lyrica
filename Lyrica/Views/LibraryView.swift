@@ -6,7 +6,7 @@ struct LibraryView: View {
     @Environment(\.dynamicTypeSize) private var dynamicType
     @Query(sort: \StoredSong.lastViewed, order: .reverse) private var songs: [StoredSong]
     @State private var query = ""
-    @State private var favoritesOnly = true
+    @State private var favoritesOnly = false
     @State private var error: String?
     @State private var pendingRemoval: StoredSong?
 
@@ -21,8 +21,8 @@ struct LibraryView: View {
         List {
             Section {
                 Picker("Show songs", selection: $favoritesOnly) {
-                    Text("Favorites").tag(true)
                     Text("Recently viewed").tag(false)
+                    Text("Favorites").tag(true)
                 }
                 .pickerStyle(.segmented)
                 .padding(.vertical, 4)
@@ -114,7 +114,7 @@ struct LibraryView: View {
     private func favoriteCard(_ record: StoredSong) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             GeometryReader { geometry in
-                ArtworkView(url: record.song.artworkURL, size: geometry.size.width)
+                ArtworkView(song: record.song, size: geometry.size.width)
             }
             .aspectRatio(1, contentMode: .fit)
             VStack(alignment: .leading, spacing: 3) {
@@ -136,7 +136,7 @@ struct LibraryView: View {
     }
 
     private var offlineExplanation: some View {
-        Text("Saved badges mark lyrics available on this iPhone. Languages you’ve already translated are available offline too.")
+        Text("Offline marks lyrics saved on this iPhone, along with the languages you’ve already translated. Other songs are bookmarks of the song details.")
             .font(.footnote)
             .foregroundStyle(.secondary)
             .textCase(nil)

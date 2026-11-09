@@ -23,6 +23,10 @@ const paths = {
   chevron: '<path d="m8 5 7 7-7 7"/>',
   check: '<path d="m5 12 4 4L19 6"/>',
   link: '<path d="m9 15 6-6m-4-2 2-2a5 5 0 0 1 7 7l-3 3m-4 2-2 2a5 5 0 0 1-7-7l3-3"/>',
+  share: '<path d="M12 15V3m-4 4 4-4 4 4M7 10H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-1"/>',
+  upload: '<path d="M12 15V3m-4 4 4-4 4 4M4 17v3h16v-3"/>',
+  copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"/>',
+  eye: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
 };
 export function icon(name, filled = false) {
   return `<svg class="icon${filled ? " icon-filled" : ""}" viewBox="0 0 24 24" fill="${filled ? "currentColor" : "none"}" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${paths[name] || paths.note}</svg>`;

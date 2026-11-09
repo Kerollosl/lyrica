@@ -44,3 +44,13 @@ Automated semantic checks cover three specific regressions: Spanish *you can cou
 - Deterministic browser tests cover legacy-cache preservation, explicit refresh, grouped alignment/highlighting, cached style switching, manual correction, and reader options at 320/390px.
 - Actual WebAssembly inference ran for all three languages; the existing offline reload/model-removal check also passed.
 - Run `python3 tests/web/quality.py` with the local server to repeat the opt-in real-model quality checks (about 350 MB of downloads). Physical iPhone latency/memory and translation quality on the user’s actual songs remain unverified.
+
+## Speed and decoding review — 2026-11-09
+
+Measured on a desktop Mac in headless Chromium with the same pinned models (`python3 tests/web/quality.py` now prints timing). These are desktop numbers; phone speed is unverified.
+
+- **Baseline:** about 100–150 ms per short phrase once a model is loaded; the first phrase of a language takes about 2–2.5 s because it includes loading the model.
+- **Beam search is already on.** The pinned OPUS-MT models carry `num_beams: 4` in their generation config. Passing 1, 4 or 8 beams explicitly changed neither output nor timing, so a "better quality" switch would do nothing and was not added. Decoding is not greedy, and `do_sample: false` is not what makes it so.
+- **Batching does not help.** Translating ten phrases in one padded `generate` call took 7.8–9.3 s versus 1.2 s one at a time, and the padded outputs were corrupted (runaway "....???"). Phrases stay sequential.
+- **WebGPU is not usable with these files.** An adapter was available, but the 8-bit (`q8`) models produced garbage ("señalar señalar …") and ran about 15× slower than WebAssembly. Single-threaded WebAssembly in a worker stays the engine. A float16/float32 model might work on WebGPU, but needs a much larger download and device testing.
+- **What remains.** Meaningful accuracy gains would need a larger model (for example NLLB-600M: several hundred MB, slower) or a cloud translator (changes the privacy and cost model). Both are product decisions, not tuning. On iPhone, translating stanzas rather than single lines is untested because Apple Translation does not run in the simulator.

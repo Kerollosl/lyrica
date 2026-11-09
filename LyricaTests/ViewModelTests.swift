@@ -71,4 +71,42 @@ final class ViewModelTests: XCTestCase {
         await model.prepareTranslation(store: store, settings: settings)
         XCTAssertEqual(model.translated, ["Hello", "", "World"])
     }
+
+    func testExampleReadsWithIncludedTranslationsWithoutNetworkOrTranslationSession() async throws {
+        let container = try ModelContainer(for: StoredSong.self, CachedTranslation.self, RecentSearch.self,
+                                           configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let store = LibraryStore(context: container.mainContext)
+        let name = "ViewModelTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        let settings = AppSettings(defaults: defaults)
+        let model = ReaderViewModel.make(for: DemoContent.song)
+        XCTAssertTrue(model.isDemo)
+        await model.load(store: store, settings: settings)
+        XCTAssertEqual(model.document, DemoContent.document)
+        await model.prepareTranslation(store: store, settings: settings)
+        XCTAssertEqual(model.translated, DemoContent.translations["en"])
+        XCTAssertNil(model.request)
+        model.targetLanguage = "ar"
+        await model.prepareTranslation(store: store, settings: settings)
+        XCTAssertEqual(model.translated, DemoContent.translations["ar"])
+        // Every included translation stays aligned with the original's lines.
+        for lines in DemoContent.translations.values {
+            XCTAssertEqual(lines.count, DemoContent.document.lines.count)
+        }
+    }
+
+    func testStudyAndOfflineOfferPreferencesPersist() throws {
+        let name = "ViewModelTests.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        let settings = AppSettings(defaults: defaults)
+        XCTAssertFalse(settings.hideTranslations)
+        XCTAssertFalse(settings.offeredOfflineStorage)
+        settings.hideTranslations = true
+        settings.offeredOfflineStorage = true
+        let reloaded = AppSettings(defaults: defaults)
+        XCTAssertTrue(reloaded.hideTranslations)
+        XCTAssertTrue(reloaded.offeredOfflineStorage)
+    }
 }

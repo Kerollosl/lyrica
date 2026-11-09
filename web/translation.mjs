@@ -25,18 +25,28 @@ export async function clearTranslationModels() {
 }
 export async function detectLanguage(text) {
   if (!globalThis.LanguageDetector) return null;
-  try {
-    if ((await LanguageDetector.availability()) !== "available") return null;
-    const detector = await LanguageDetector.create();
-    try {
-      const [result] = await detector.detect(text);
-      return result?.confidence >= 0.5 ? result.detectedLanguage : null;
-    } finally {
-      detector.destroy();
-    }
-  } catch {
-    return null;
-  }
+  let timer;
+  // Like the Translator check, detection must not stall the reader.
+  return Promise.race([
+    (async () => {
+      try {
+        if ((await LanguageDetector.availability()) !== "available")
+          return null;
+        const detector = await LanguageDetector.create();
+        try {
+          const [result] = await detector.detect(text);
+          return result?.confidence >= 0.5 ? result.detectedLanguage : null;
+        } finally {
+          detector.destroy();
+        }
+      } catch {
+        return null;
+      }
+    })(),
+    new Promise((resolve) => {
+      timer = setTimeout(() => resolve(null), 3000);
+    }),
+  ]).finally(() => clearTimeout(timer));
 }
 export async function translationStatus(source, target) {
   if (!source) return "source-needed";
@@ -49,10 +59,19 @@ export async function translationStatus(source, target) {
     return "model-ready";
   if (globalThis.Translator) {
     try {
-      const available = await Translator.availability({
-        sourceLanguage: source,
-        targetLanguage: target,
-      });
+      // Some Chrome builds never settle this check while the on-device
+      // component is unready. Don't let it freeze the reader: after a short
+      // wait, fall back to the downloadable-model path below.
+      let timer;
+      const available = await Promise.race([
+        Translator.availability({
+          sourceLanguage: source,
+          targetLanguage: target,
+        }),
+        new Promise((resolve) => {
+          timer = setTimeout(() => resolve("unavailable"), 3000);
+        }),
+      ]).finally(() => clearTimeout(timer));
       if (available !== "unavailable") return available;
     } catch {
       /* A local model may still support this language pair. */

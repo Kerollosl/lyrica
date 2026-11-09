@@ -16,6 +16,131 @@ export const languages = {
   he: "עברית",
 };
 export const rtl = (code) => /^(ar|he|fa|ur)(-|$)/.test(code || "");
+const pluralRules = new Intl.PluralRules("en");
+/** "1 song", "2 songs": English plural forms for interface counts. */
+export const plural = (count, one, other = `${one}s`) =>
+  `${count} ${pluralRules.select(count) === "one" ? one : other}`;
+
+/**
+ * Guess a lyric's language from its writing system when the browser has no
+ * language detector. Only unambiguous scripts are guessed; Latin-script
+ * languages (Spanish, French, Italian…) are left for the reader to choose.
+ */
+export function scriptLanguage(text) {
+  const letters = String(text || "").match(/\p{L}/gu) || [];
+  if (letters.length < 4) return "";
+  const share = (pattern) =>
+    letters.filter((letter) => pattern.test(letter)).length / letters.length;
+  if (share(/\p{Script=Arabic}/u) > 0.6) return "ar";
+  if (share(/\p{Script=Hebrew}/u) > 0.6) return "he";
+  if (share(/\p{Script=Hangul}/u) > 0.4) return "ko";
+  if (share(/[\p{Script=Hiragana}\p{Script=Katakana}]/u) > 0.15) return "ja";
+  if (share(/\p{Script=Han}/u) > 0.6) return "zh-Hans";
+  if (share(/\p{Script=Devanagari}/u) > 0.6) return "hi";
+  return "";
+}
+
+// Common function words, enough to tell the main Latin-script languages apart
+// without any browser feature (iPhone browsers have no language detector).
+const wordLists = {
+  es: "el la los las un una unos unas y o pero que de del al en es son era soy eres estoy está estás tú yo me te se mi tu su lo le les nos por para con sin sobre como cuando donde porque más muy ya no sí hoy nada todo todos cada aquí allí ni hay",
+  fr: "le la les un une des et ou mais que qui de du au aux en est sont était suis es je tu il elle nous vous ils elles me te se mon ton son ma ta sa mes tes ses pour avec sans sur dans comme quand où parce plus très déjà ne pas oui rien tout tous chaque ici ça c'est j'ai n'en",
+  it: "il lo la i gli le un una uno e o ma che di del della dei in è sono era sei io tu lui lei noi voi loro mi ti si ci mio tuo suo per con senza su come quando dove perché più molto già non sì oggi niente tutto ogni qui là anche",
+  pt: "o a os as um uma uns umas e ou mas que de do da dos das em no na nos nas é são era sou és eu tu ele ela nós vocês me te se meu teu seu para com sem sobre como quando onde porque mais muito já não sim hoje nada tudo cada aqui lá também",
+  de: "der die das den dem ein eine und oder aber dass von zu in ist sind war bin bist ich du er sie es wir ihr mich dich sich mein dein sein für mit ohne auf wie wann wo weil mehr sehr schon nicht ja heute nichts alles jede hier auch",
+  en: "the a an and or but that of to in is are was were am be i you he she it we they me my your his her our for with without on as when where because more very already not yes today nothing all every here also this there what",
+};
+const wordSets = Object.fromEntries(
+  Object.entries(wordLists).map(([code, list]) => [code, new Set(list.split(" "))]),
+);
+/**
+ * Guess a Latin-script lyric's language from common words. Returns "" unless
+ * one language is clearly ahead, so a wrong guess is rare; the reader can
+ * always correct it with the language picker.
+ */
+export function guessLanguage(text) {
+  const words = (String(text || "").toLowerCase().match(/[\p{L}'’]+/gu) || []).map(
+    (word) => word.replace(/’/g, "'"),
+  );
+  if (words.length < 6) return "";
+  const scores = Object.entries(wordSets)
+    .map(([code, set]) => [code, words.filter((word) => set.has(word)).length])
+    .sort((a, b) => b[1] - a[1]);
+  const [[best, top], [, next]] = scores;
+  return top / words.length >= 0.2 && top >= next * 1.4 && top - next >= 2
+    ? best
+    : "";
+}
+
+const BACKUP_LIMIT = 5000;
+/**
+ * Validate a Lyrica library backup and return storage records in the existing
+ * shape. Lyric content is kept only when offline storage is enabled, so an
+ * import never stores lyrics the reader hasn't opted in to keep.
+ */
+export function parseBackup(json, { allowContent = false } = {}) {
+  let data;
+  try {
+    data = typeof json === "string" ? JSON.parse(json) : json;
+  } catch {
+    throw new Error("This file isn’t a Lyrica library backup.");
+  }
+  if (data?.app !== "lyrica-web" || !Array.isArray(data.songs))
+    throw new Error("This file isn’t a Lyrica library backup.");
+  if (data.songs.length > BACKUP_LIMIT)
+    throw new Error(`Backups can include up to ${BACKUP_LIMIT} songs.`);
+  const text = (value) => (typeof value === "string" ? value : "");
+  let withheld = 0;
+  const records = data.songs.flatMap((record) => {
+    const song = record?.song;
+    if (!song || (typeof song.id !== "string" && typeof song.id !== "number"))
+      return [];
+    if (!text(song.title) || !text(song.artist)) return [];
+    const https = (url) => (text(url).startsWith("https://") ? url : undefined);
+    const document =
+      record.document && typeof record.document.text === "string"
+        ? { ...record.document, text: record.document.text }
+        : null;
+    const translations =
+      record.translations && typeof record.translations === "object"
+        ? Object.fromEntries(
+            Object.entries(record.translations).filter(
+              ([, lines]) =>
+                Array.isArray(lines) &&
+                lines.every((line) => typeof line === "string"),
+            ),
+          )
+        : {};
+    if (!allowContent && (document || Object.keys(translations).length))
+      withheld++;
+    return [
+      {
+        id: String(song.id),
+        song: {
+          id: song.id,
+          title: text(song.title),
+          artist: text(song.artist),
+          album: text(song.album),
+          duration: Number(song.duration) || 0,
+          ...(https(song.artworkURL) && { artworkURL: song.artworkURL }),
+          ...(https(song.appleMusicURL) && { appleMusicURL: song.appleMusicURL }),
+          ...(song.demo === true && { demo: true }),
+        },
+        favorite: record.favorite === true,
+        viewed: Number(record.viewed) || 0,
+        document: allowContent ? document : null,
+        translations: allowContent ? translations : {},
+      },
+    ];
+  });
+  return {
+    records,
+    withheld,
+    recent: Array.isArray(data.recent)
+      ? data.recent.filter((query) => typeof query === "string").slice(0, 8)
+      : [],
+  };
+}
 export const escapeHTML = (text) =>
   String(text ?? "").replace(
     /[&<>"']/g,
@@ -172,7 +297,7 @@ export const demo = {
     id: "lyrica-original-demo",
     title: "Donde empieza el día",
     artist: "Lyrica Studio",
-    album: "An original bilingual demo",
+    album: "An original bilingual example",
     duration: 0,
     demo: true,
   },

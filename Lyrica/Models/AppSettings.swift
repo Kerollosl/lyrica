@@ -33,6 +33,14 @@ final class AppSettings {
     var cacheLyrics: Bool {
         didSet { defaults.set(cacheLyrics, forKey: "cacheLyrics") }
     }
+    /// Study mode: translations stay hidden until a line is tapped.
+    var hideTranslations: Bool {
+        didSet { defaults.set(hideTranslations, forKey: "hideTranslations") }
+    }
+    /// Favoriting offers offline storage once; afterwards a favorite is simply a bookmark.
+    var offeredOfflineStorage: Bool {
+        didSet { defaults.set(offeredOfflineStorage, forKey: "offeredOfflineStorage") }
+    }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -41,5 +49,7 @@ final class AppSettings {
         fontSize = min(max(storedSize, 14), 30)
         appearance = Appearance(rawValue: defaults.string(forKey: "appearance") ?? "system") ?? .system
         cacheLyrics = defaults.bool(forKey: "cacheLyrics")
+        hideTranslations = defaults.bool(forKey: "hideTranslations")
+        offeredOfflineStorage = defaults.bool(forKey: "offeredOfflineStorage")
     }
 }
