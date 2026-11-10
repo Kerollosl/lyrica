@@ -7,9 +7,51 @@ enum LyricaStyle {
     static let paper = Color(uiColor: .systemBackground)
     static let surface = Color(uiColor: .secondarySystemGroupedBackground)
     static let ink = Color.primary
-    static let secondary = Color.secondary
+    /// The asset keeps secondary text at 5.9:1 (light) and 9:1 (dark); the system secondary label is dimmer.
+    static let secondary = Color("SecondaryInk")
     static let stroke = Color(uiColor: .separator)
     static let accentInk = Color("AccentInk")
+
+    /// Shared motion. A little bounce reads as physical without delaying reading.
+    /// Callers pass Reduce Motion through `motion` so springs become instant changes.
+    static let spring = Animation.spring(duration: 0.42, bounce: 0.3)
+    static let snappy = Animation.spring(duration: 0.3, bounce: 0.18)
+    static func motion(_ animation: Animation, reduce: Bool) -> Animation? { reduce ? nil : animation }
+
+    /// Soft, continuous corners scale with the thing they round.
+    static func radius(for size: CGFloat) -> CGFloat { min(max(size * 0.2, 10), 22) }
+    static let cardRadius: CGFloat = 20
+    static let rowRadius: CGFloat = 14
+}
+
+/// Filled primary action. The label uses the AccentInk asset (white on the light blue fill, black on the lighter dark-mode
+/// blue) so contrast holds in both appearances; the system's prominent style would put white on the light dark-mode blue.
+struct ProminentActionStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.body.weight(.semibold))
+            .foregroundStyle(LyricaStyle.accentInk)
+            .padding(.horizontal, 20)
+            .frame(minHeight: 50)
+            .background(LyricaStyle.accent, in: RoundedRectangle(cornerRadius: LyricaStyle.rowRadius, style: .continuous))
+            .opacity(isEnabled ? 1 : 0.4)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.96 : 1)
+            .animation(reduceMotion ? nil : LyricaStyle.snappy, value: configuration.isPressed)
+    }
+}
+
+/// Presses sink slightly and spring back. With Reduce Motion the scale is skipped.
+struct PressScaleStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.96 : 1)
+            .animation(reduceMotion ? nil : LyricaStyle.snappy, value: configuration.isPressed)
+    }
 }
 
 struct ArtworkView: View {
@@ -40,14 +82,14 @@ struct ArtworkView: View {
                             Color(uiColor: .secondarySystemFill)
                             Image(systemName: "music.note")
                                 .font(.system(size: size * 0.28))
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(LyricaStyle.secondary)
                         }
                     }
                 }
             }
         }
         .frame(width: size, height: size)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(RoundedRectangle(cornerRadius: LyricaStyle.radius(for: size), style: .continuous))
         .accessibilityHidden(true)
     }
 }
@@ -91,10 +133,10 @@ struct SongRow: View {
     @Environment(\.dynamicTypeSize) private var dynamicType
 
     var body: some View {
-        HStack(spacing: 14) {
-            ArtworkView(song: song, size: dynamicType.isAccessibilitySize ? 64 : 58)
+        HStack(spacing: 16) {
+            ArtworkView(song: song, size: dynamicType.isAccessibilitySize ? 68 : 62)
             VStack(alignment: .leading, spacing: 5) {
-                Text(song.title).font(.body).foregroundStyle(LyricaStyle.ink)
+                Text(song.title).font(.body.weight(.semibold)).foregroundStyle(LyricaStyle.ink)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(song.artist).font(.subheadline).foregroundStyle(LyricaStyle.secondary)
                 Text(song.album).font(.caption).foregroundStyle(LyricaStyle.secondary).lineLimit(2)
@@ -112,8 +154,8 @@ struct SongRow: View {
                 }
             }
         }
-        .padding(.vertical, 4)
-        .frame(minHeight: 60)
+        .padding(.vertical, 8)
+        .frame(minHeight: 64)
         .accessibilityElement(children: .combine)
     }
 }
@@ -122,7 +164,7 @@ struct SavedBadge: View {
     var body: some View {
         Label("Offline", systemImage: "arrow.down.circle.fill")
             .font(.caption2)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(LyricaStyle.secondary)
             .accessibilityLabel("Lyrics saved offline")
     }
 }
@@ -148,7 +190,7 @@ struct NoticeView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: symbol).font(.body).foregroundStyle(.secondary)
+            Image(systemName: symbol).font(.body).foregroundStyle(LyricaStyle.secondary)
                 .frame(width: 22).padding(.top, 1).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 6) {
                 Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(LyricaStyle.ink)

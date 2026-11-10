@@ -78,12 +78,15 @@ final class ReaderViewModel {
         targetLanguage = settings.defaultLanguage
         defer { if loadGeneration == loadToken { isLoading = false } }
         do {
-            if let stored = try store.storedSong(id: song.id) {
+            let stored = try store.storedSong(id: song.id)
+            if let stored {
                 isFavorite = stored.isFavorite
                 document = stored.document
             }
-            // Keep a metadata bookmark even when this recording has no available lyrics.
-            try store.upsert(song: song)
+            // Keep a metadata bookmark even when this recording has no available lyrics. With history turned off,
+            // a song is only recorded if it is already in the library (favorite or saved offline).
+            let remembers = settings.keepHistory || stored != nil
+            if remembers { try store.upsert(song: song) }
             if document == nil {
                 let fetched = try await provider.lyrics(for: song)
                 try Task.checkCancellation()
@@ -91,7 +94,7 @@ final class ReaderViewModel {
                 document = fetched
             }
             try Task.checkCancellation()
-            try store.upsert(song: song, document: settings.cacheLyrics ? document : nil)
+            if remembers || settings.cacheLyrics { try store.upsert(song: song, document: settings.cacheLyrics ? document : nil) }
         } catch is CancellationError { }
         catch {
             guard loadGeneration == loadToken else { return }
@@ -110,7 +113,13 @@ final class ReaderViewModel {
         document = replacement
         translated = []
         lyricsError = nil
-        do { try store.upsert(song: song, document: settings.cacheLyrics ? replacement : nil) }
+        do {
+            // With history off, only songs already in the library (or saved offline on purpose) are written.
+            let inLibrary = try store.storedSong(id: song.id) != nil
+            if settings.keepHistory || settings.cacheLyrics || inLibrary {
+                try store.upsert(song: song, document: settings.cacheLyrics ? replacement : nil)
+            }
+        }
         catch { storageError = error.localizedDescription }
     }
 

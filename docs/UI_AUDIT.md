@@ -1,5 +1,22 @@
 # Lyrica UI audit
 
+## 2026-11-09 restyle: soft modern, springy
+
+**Direction (changed):** the earlier flat, compact look is replaced by a soft modern one: larger radii, three elevation levels, tonal surfaces, a floating phone tab bar, generous type and spacing, and spring motion. `PRODUCT.md` records the product context; `DESIGN.md` records the visual rules.
+
+| Area | Change |
+| --- | --- |
+| Web tokens | Radius, 4/8 spacing, elevation, and spring tokens in `web/style.css`; canvas `#F6F6F9` / `#0B0B0D` (no pure black). |
+| Web type and layout | 36px bold titles, 22px section headings, 16–17px body, looser leading, 32–48px section gaps. |
+| Web surfaces | Example card, song rows, settings groups, dialogs and menus are rounded and raised; the language bar is a card and shares column geometry with the lyric rows. |
+| Web motion | Press-scale, springy switch and heart, menu and dialog entrances, page rise on route change, bouncy toast, all under reduced motion. |
+| iPhone | Spring replaces the 0.18s ease; `PressScaleStyle`; zoom transition from the example card to the Reader; haptics on favorite and line selection; larger artwork with continuous corners; larger song title. |
+| Tests | Theme-color expectations in `browser.py` updated to the new canvas colors; service-worker cache bumped to `v8`. |
+
+**Verification:** 28 web unit tests and all 14 `browser.py` groups pass; 17 native tests pass on an iPhone 17 Pro simulator. Spring feel, haptics and Reduce Motion behavior still need a physical device. These changes were not re-scored.
+
+---
+
 ## 2026-11-09 review: flows, resilience, and study features
 
 **Scope:** web companion and iPhone app, reviewed against real flows (refresh, Back, toggles, favorites, keyboard, storage failure) rather than screenshots alone.

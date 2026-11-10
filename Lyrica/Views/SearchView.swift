@@ -5,13 +5,17 @@ import LyricaCore
 struct SearchView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dynamicTypeSize) private var dynamicType
+    @Environment(AppSettings.self) private var settings
     @Query(sort: \RecentSearch.searchedAt, order: .reverse) private var recent: [RecentSearch]
     @Query(sort: \StoredSong.lastViewed, order: .reverse) private var viewed: [StoredSong]
     @State private var model = SearchViewModel()
     @State private var storageError: String?
     @State private var opensExample = LaunchOptions.opensExample
+    @Namespace private var transitions
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private var isQueryEmpty: Bool { model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    private var trimmedQuery: String { model.query.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var isQueryEmpty: Bool { trimmedQuery.isEmpty }
     private var artworkSize: CGFloat { dynamicType.isAccessibilitySize ? 160 : 104 }
 
     var body: some View {
@@ -22,9 +26,16 @@ struct SearchView: View {
                 Section {
                     HStack(spacing: 10) {
                         ProgressView()
-                        Text("Searching…").foregroundStyle(.secondary)
+                        Text("Searching…").foregroundStyle(LyricaStyle.secondary)
                     }
                     SongLoadingRows()
+                }
+            } else if model.searchedTerm != trimmedQuery {
+                // Typing doesn't search; Return does. That keeps every keystroke from becoming a network request.
+                Section {
+                    Label("Press Search on the keyboard to look up “\(trimmedQuery)”.", systemImage: "return")
+                        .foregroundStyle(LyricaStyle.secondary)
+                        .frame(minHeight: 44, alignment: .leading)
                 }
             } else if let error = model.error {
                 Section {
@@ -32,7 +43,7 @@ struct SearchView: View {
                     Button("Try again") { Task { await model.search(immediately: true) } }
                 }
             } else if model.hasSearched && model.results.isEmpty {
-                ContentUnavailableView.search(text: model.query)
+                ContentUnavailableView.search(text: model.searchedTerm)
                     .listRowBackground(Color.clear)
             } else if !model.results.isEmpty {
                 Section {
@@ -40,7 +51,8 @@ struct SearchView: View {
                         NavigationLink {
                             ReaderView(song: song)
                                 .task {
-                                    do { try LibraryStore(context: context).recordSearch(model.query) }
+                                    guard settings.keepHistory else { return }
+                                    do { try LibraryStore(context: context).recordSearch(model.searchedTerm) }
                                     catch { storageError = error.localizedDescription }
                                 }
                         } label: {
@@ -60,7 +72,11 @@ struct SearchView: View {
         .navigationDestination(isPresented: $opensExample) { ReaderView(song: DemoContent.song) }
         .searchable(text: $model.query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Song, artist, album, or Apple Music link")
         .autocorrectionDisabled()
-        .task(id: model.query) { await model.search() }
+        .onSubmit(of: .search) { Task { await model.search(immediately: true) } }
+        .onChange(of: model.query) { _, query in
+            // Clearing the field resets the screen; anything else waits for Return.
+            if query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { Task { await model.search(immediately: true) } }
+        }
         .alert("Storage issue", isPresented: Binding(get: { storageError != nil }, set: { if !$0 { storageError = nil } })) {
             Button("OK") { storageError = nil }
         } message: { Text(storageError ?? "") }
@@ -70,41 +86,47 @@ struct SearchView: View {
     private var discovery: some View {
         Section {
             Text("Find lyrics by song, artist, or album. You can also paste an Apple Music song link.")
-                .font(.subheadline).foregroundStyle(.secondary)
+                .font(.body).foregroundStyle(LyricaStyle.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-                .padding(.vertical, 4)
+                .padding(.vertical, 8)
         }
         .listRowBackground(Color.clear)
 
         Section {
-            NavigationLink { ReaderView(song: DemoContent.song) } label: {
-                HStack(spacing: 14) {
-                    ArtworkView(song: DemoContent.song, size: dynamicType.isAccessibilitySize ? 64 : 58)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Try an example").font(.body.weight(.semibold)).foregroundStyle(.primary)
+            NavigationLink {
+                ReaderView(song: DemoContent.song)
+                    .navigationTransition(.zoom(sourceID: "example", in: transitions))
+            } label: {
+                HStack(spacing: 16) {
+                    ArtworkView(song: DemoContent.song, size: dynamicType.isAccessibilitySize ? 72 : 76)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Try an example").font(.title3.weight(.bold)).foregroundStyle(.primary)
                         Text("Read a Spanish verse with included translations.")
-                            .font(.subheadline).foregroundStyle(.secondary)
+                            .font(.subheadline).foregroundStyle(LyricaStyle.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                .padding(.vertical, 4)
+                .padding(.vertical, 10)
+                .matchedTransitionSource(id: "example", in: transitions)
                 .accessibilityElement(children: .combine)
                 .accessibilityHint("Opens an original bilingual example")
             }
         }
+        .listRowBackground(RoundedRectangle(cornerRadius: LyricaStyle.cardRadius, style: .continuous).fill(LyricaStyle.surface))
+        .listRowInsets(EdgeInsets(top: 8, leading: 20, bottom: 8, trailing: 20))
 
         if !viewed.isEmpty {
             Section("Recently viewed") {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(alignment: .top, spacing: 16) {
+                    HStack(alignment: .top, spacing: 20) {
                         ForEach(Array(viewed.prefix(8))) { record in
                             NavigationLink { ReaderView(song: record.song) } label: {
                                 recentCard(record)
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(PressScaleStyle())
                         }
                     }
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 8)
                 }
             }
             .listRowBackground(Color.clear)
@@ -140,7 +162,7 @@ struct SearchView: View {
                 .lineLimit(dynamicType.isAccessibilitySize ? nil : 2)
                 .multilineTextAlignment(.leading)
             Text(record.song.artist)
-                .font(.caption).foregroundStyle(.secondary)
+                .font(.caption).foregroundStyle(LyricaStyle.secondary)
                 .lineLimit(dynamicType.isAccessibilitySize ? nil : 2)
             if record.document != nil { SavedBadge() }
         }

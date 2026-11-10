@@ -107,7 +107,7 @@ struct LibraryView: View {
         HStack {
             Text(title)
             Spacer()
-            Text("\(count)").font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+            Text("\(count)").font(.caption.monospacedDigit()).foregroundStyle(LyricaStyle.secondary)
         }
     }
 
@@ -124,7 +124,7 @@ struct LibraryView: View {
                     .lineLimit(dynamicType.isAccessibilitySize ? nil : 2)
                 Text(record.artist)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(LyricaStyle.secondary)
                     .lineLimit(dynamicType.isAccessibilitySize ? nil : 1)
                 if record.document != nil { SavedBadge() }
             }
@@ -138,7 +138,7 @@ struct LibraryView: View {
     private var offlineExplanation: some View {
         Text("Offline marks lyrics saved on this iPhone, along with the languages you’ve already translated. Other songs are bookmarks of the song details.")
             .font(.footnote)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(LyricaStyle.secondary)
             .textCase(nil)
             .padding(.top, 4)
     }

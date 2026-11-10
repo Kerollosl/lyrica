@@ -27,7 +27,7 @@ struct SettingsView: View {
                     HStack {
                         Text("Lyrics text size")
                         Spacer()
-                        Text("\(Int(settings.fontSize)) pt").monospacedDigit().foregroundStyle(.secondary)
+                        Text("\(Int(settings.fontSize)) pt").monospacedDigit().foregroundStyle(LyricaStyle.secondary)
                     }
                     Slider(value: $settings.fontSize, in: 14...30, step: 1)
                         .accessibilityLabel("Lyrics text size")
@@ -38,7 +38,7 @@ struct SettingsView: View {
                             .foregroundStyle(.primary)
                         Text("A preview of your reading size")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(LyricaStyle.secondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.vertical, 8)
@@ -74,6 +74,9 @@ struct SettingsView: View {
                 } label: {
                     Text("Cached translations")
                 }
+                Toggle(isOn: $settings.keepHistory) {
+                    Text("Remember recent searches and songs")
+                }
                 Button("Clear lyrics and translations", role: .destructive) { confirmation = .cache }
                     .frame(minHeight: 44)
                 Button("Clear recent searches", role: .destructive) { confirmation = .searches }
@@ -83,7 +86,7 @@ struct SettingsView: View {
             } header: {
                 Text("Storage")
             } footer: {
-                Text("Offline saving is optional. Turning it off removes saved lyrics and translations, while favorite bookmarks and viewing history stay. Apple’s language downloads are managed separately in system settings.")
+                Text("Offline saving is optional. Turning it off removes saved lyrics and translations, while favorite bookmarks and viewing history stay. Turn off “Remember recent searches and songs” to stop recording new history; favorites and songs saved offline are unaffected. Apple’s language downloads are managed separately in system settings.")
             }
             .listRowBackground(Color(uiColor: .secondarySystemGroupedBackground))
 
@@ -96,12 +99,24 @@ struct SettingsView: View {
                 Link(destination: URL(string: "https://lrclib.net")!) {
                     externalLinkLabel("Lyrics · LRCLIB")
                 }
+                Link(destination: AppLinks.privacyPolicy) {
+                    externalLinkLabel("Privacy Policy")
+                }
+                Link(destination: AppLinks.support) {
+                    externalLinkLabel("Support")
+                }
+                LabeledContent {
+                    Text(Self.versionText).monospacedDigit()
+                } label: {
+                    Text("Version")
+                }
+                .frame(minHeight: 44)
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Lyrics belong to their respective rights holders. Availability varies, and access through LRCLIB does not grant permission to store or redistribute lyrics. Only paste and save material you’re permitted to use. Machine translations may be imperfect.")
                     Text("Search terms go to Apple. Recording metadata goes to LRCLIB. Lyrics are translated by Apple’s on-device framework; language downloads need an internet connection. Lyrica has no analytics or backend.")
                 }
                 .font(.footnote)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(LyricaStyle.secondary)
                 .padding(.vertical, 5)
             }
             .listRowBackground(Color(uiColor: .secondarySystemGroupedBackground))
@@ -125,6 +140,13 @@ struct SettingsView: View {
         } message: {
             Text(error ?? "")
         }
+    }
+
+    private static var versionText: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "1.0"
+        let build = info?["CFBundleVersion"] as? String ?? "1"
+        return "\(version) (\(build))"
     }
 
     private func externalLinkLabel(_ title: String) -> some View {

@@ -100,4 +100,37 @@ final class NetworkingTests: XCTestCase {
         let requests = await transport.requests
         XCTAssertTrue(requests.isEmpty)
     }
+    func testPacerAllowsABurstWithoutWaitingThenFailsFastAfterTooManyRequests() async throws {
+        let pacer = RequestPacer()
+        let policy = RequestPacer.Policy(minInterval: 0, burst: 3, window: 60)
+        let start = Date()
+        for _ in 0..<3 { try await pacer.wait(host: "burst.example", policy: policy) }
+        XCTAssertLessThan(Date().timeIntervalSince(start), 1, "a normal burst must not be spaced out")
+        do {
+            try await pacer.wait(host: "burst.example", policy: policy)
+            XCTFail("The fourth request would wait about a minute, so it should fail fast")
+        } catch { XCTAssertEqual(error as? LyricaError, .rateLimited) }
+    }
+
+    func testPacerLeavesAHostAloneAfterA429() async {
+        let pacer = RequestPacer()
+        await pacer.cooldown(host: "limited.example", seconds: 30)
+        do {
+            try await pacer.wait(host: "limited.example", policy: .standard)
+            XCTFail("Expected the cooldown to block the request")
+        } catch { XCTAssertEqual(error as? LyricaError, .rateLimited) }
+        do { try await pacer.wait(host: "other.example", policy: .standard) } catch { XCTFail("Other hosts are unaffected") }
+    }
+
+    func testRetryAfterIsReadAndClamped() throws {
+        func response(_ value: String?) throws -> HTTPURLResponse {
+            try XCTUnwrap(HTTPURLResponse(url: URL(string: "https://example.com")!, statusCode: 429, httpVersion: "HTTP/1.1",
+                                          headerFields: value.map { ["Retry-After": $0] }))
+        }
+        XCTAssertEqual(HTTPClient.retryAfter(try response("45")), 45)
+        XCTAssertEqual(HTTPClient.retryAfter(try response("1")), 5)
+        XCTAssertEqual(HTTPClient.retryAfter(try response("9999")), 120)
+        XCTAssertEqual(HTTPClient.retryAfter(try response(nil)), 30)
+        XCTAssertEqual(HTTPClient.retryAfter(try response("Wed, 21 Oct 2026 07:28:00 GMT")), 30)
+    }
 }

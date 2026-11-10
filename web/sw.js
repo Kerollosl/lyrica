@@ -1,4 +1,4 @@
-const CACHE = "lyrica-shell-v8";
+const CACHE = "lyrica-shell-v9";
 const RUNTIME = "lyrica-translation-runtime-v1";
 const SHELL = [
   "./",
@@ -16,6 +16,7 @@ const SHELL = [
   "./translation-text.mjs",
   "./icon.png",
   "./icon-192.png",
+  "./apple-touch-icon.png",
   "./manifest.webmanifest",
 ];
 self.addEventListener("install", (event) => {

@@ -26,7 +26,7 @@ See [web setup, browser compatibility, tests, and free hosting](web/README.md). 
 
 ## Interface
 
-The web and iOS apps use system fonts, neutral light/dark backgrounds, blue controls, compact spacing, and flat lyric rows. The iPhone app uses native lists, forms, navigation, and Dynamic Type. Web navigation adapts from a plain header to a phone tab bar; both readers keep original and translated lines aligned.
+The web and iOS apps use system fonts, soft light/dark surfaces, blue controls, generous spacing, rounded cards, and spring motion. The iPhone app uses native lists, forms, navigation, and Dynamic Type. Web navigation adapts from a plain header to a phone tab bar; both readers keep original and translated lines aligned.
 
 [Design system](docs/DESIGN.md) · [UI audit](docs/UI_AUDIT.md) · [24 real web screenshots](docs/web/screenshots/) · [Device acceptance checklist](docs/DEVICE_TESTING.md)
 
@@ -40,7 +40,7 @@ These iPhone captures come from the current build on an iPhone 17 simulator. The
 
 ## What it does
 
-- **Find the right song:** debounced iTunes search by song, artist, or album, artwork and recording metadata, recent searches, and Apple Music song-link lookup. Album links that contain an `i=` song ID work too; album-only links ask for a song.
+- **Find the right song:** iTunes search on Return (results for a repeated term come from a session cache), by song, artist, or album, with artwork and recording metadata, optional recent searches and viewing history, and Apple Music song-link lookup. Album links that contain an `i=` song ID work too; album-only links ask for a song.
 - **Retrieve lyrics responsibly:** LRCLIB metadata matching uses artist, title, album, and duration. Plain lyrics take priority; timestamped lyrics are cleaned without flattening verses. Uncertain matches and instrumental recordings have explicit states. You can paste lyrics you have permission to use when a match is unavailable.
 - **Translate locally:** Apple’s Translation framework translates individual nonblank lines while retaining row identifiers and stanza breaks. English is the initial target. The picker uses languages supported by the device, including Spanish, French, Italian, Portuguese, Arabic when available, and others. Language detection can be corrected manually.
 - **Read comfortably:** one scrolling surface keeps both columns aligned, with wrapping, paired line highlighting, an optional stacked layout, adjustable text size, Dynamic Type, VoiceOver labels that use each language’s voice, and right-to-left text direction per language. Long-press any line to copy a phrase, look up a word, or translate it with the system.
@@ -122,7 +122,7 @@ Tests/LyricaCoreTests/ Pure logic and mocked HTTP coverage
 LyricaTests/           In-memory SwiftData regression tests
 ```
 
-MVVM keeps rendering separate from request/state orchestration. Network clients use `URLSession`, typed errors, bounded requests, and async cancellation. The search task is debounced and replaced as input changes. Translation work is bound to the SwiftUI Translation session lifecycle; indexed responses preserve alignment even if a batch returns out of order. Local translations are keyed to the source text and source/target languages so editing the lyrics cannot reuse an unrelated result.
+MVVM keeps rendering separate from request/state orchestration. Network clients use `URLSession`, typed errors, bounded requests, and async cancellation. Searches run on submit, and a newer search replaces an older one. Requests share a pacer that allows a short burst, spaces them only after that, and honors 429 cooldowns. Translation work is bound to the SwiftUI Translation session lifecycle; indexed responses preserve alignment even if a batch returns out of order. Local translations are keyed to the source text and source/target languages so editing the lyrics cannot reuse an unrelated result.
 
 The Xcode project uses Xcode 16 filesystem-synchronized groups: adding a Swift file under `Lyrica/` or `LyricaTests/` includes it in the corresponding target automatically. The only package dependency is this repository’s local `LyricaCore` package.
 

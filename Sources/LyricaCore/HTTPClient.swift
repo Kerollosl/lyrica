@@ -27,24 +27,58 @@ public struct URLSessionTransport: HTTPTransport {
     }
 }
 
-/// Shared pacing prevents rapid searches, retries and concurrent readers from flooding either API.
+/// Shared pacing keeps rapid searches, retries and concurrent readers from flooding either API.
+/// Normal use never waits: a host allows a short burst, then spaces requests only once the burst is spent.
+/// After an HTTP 429 the host is left alone until its cooldown ends.
 actor RequestPacer {
     static let shared = RequestPacer()
-    private var nextRequest: [String: Date] = [:]
 
-    func wait(host: String, interval: TimeInterval) async throws {
+    struct Policy: Sendable {
+        var minInterval: TimeInterval   // gap between two requests to the host
+        var burst: Int                  // requests allowed inside `window` before spacing applies
+        var window: TimeInterval
+        /// Apple documents roughly 20 iTunes Search calls per minute; stay under it without a fixed 3 s gap.
+        static let iTunes = Policy(minInterval: 0.25, burst: 12, window: 60)
+        static let standard = Policy(minInterval: 0.4, burst: 1_000, window: 60)
+        static func forHost(_ host: String) -> Policy { host == "itunes.apple.com" ? .iTunes : .standard }
+    }
+
+    private var nextRequest: [String: Date] = [:]
+    private var recent: [String: [Date]] = [:]
+    private var blockedUntil: [String: Date] = [:]
+    /// Longest wait we will impose on the user. Beyond this the request fails fast with `rateLimited`.
+    private let maxWait: TimeInterval = 15
+
+    func wait(host: String, policy: Policy) async throws {
         while true {
             try Task.checkCancellation()
             let now = Date()
-            let delay = (nextRequest[host] ?? now).timeIntervalSince(now)
+            if let until = blockedUntil[host] {
+                if until > now { throw LyricaError.rateLimited }
+                blockedUntil[host] = nil
+            }
+            var stamps = (recent[host] ?? []).filter { now.timeIntervalSince($0) < policy.window }
+            recent[host] = stamps
+            var delay = (nextRequest[host] ?? now).timeIntervalSince(now)
+            if stamps.count >= policy.burst, let oldest = stamps.first {
+                delay = max(delay, oldest.addingTimeInterval(policy.window).timeIntervalSince(now))
+            }
+            if delay > maxWait { throw LyricaError.rateLimited }
             if delay > 0 {
                 try await Task.sleep(for: .seconds(delay))
-                // Recheck after suspension: another task may have claimed the next slot.
+                // Recheck after suspension: another task may have claimed the slot.
                 continue
             }
-            nextRequest[host] = now.addingTimeInterval(interval)
+            stamps.append(now)
+            recent[host] = stamps
+            nextRequest[host] = now.addingTimeInterval(policy.minInterval)
             return
         }
+    }
+
+    /// Called after a 429: no requests to this host until `seconds` have passed.
+    func cooldown(host: String, seconds: TimeInterval) {
+        blockedUntil[host] = Date().addingTimeInterval(seconds)
     }
 }
 
@@ -56,7 +90,8 @@ struct HTTPClient: Sendable {
         for attempt in 0...1 {
             try Task.checkCancellation()
             if paced {
-                try await RequestPacer.shared.wait(host: url.host ?? "", interval: url.host == "itunes.apple.com" ? 3.1 : 0.4)
+                let host = url.host ?? ""
+                try await RequestPacer.shared.wait(host: host, policy: .forHost(host))
             }
             var request = URLRequest(url: url, timeoutInterval: 20)
             request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -69,7 +104,9 @@ struct HTTPClient: Sendable {
                     do { return try JSONDecoder().decode(type, from: data) }
                     catch { throw LyricaError.invalidResponse }
                 case 404: throw notFoundError
-                case 429: throw LyricaError.rateLimited
+                case 429:
+                    if paced { await RequestPacer.shared.cooldown(host: url.host ?? "", seconds: Self.retryAfter(response)) }
+                    throw LyricaError.rateLimited
                 case 500...599 where attempt == 0:
                     try await Task.sleep(for: .milliseconds(500))
                     continue
@@ -81,5 +118,11 @@ struct HTTPClient: Sendable {
             }
         }
         throw LyricaError.invalidResponse
+    }
+
+    /// The server's Retry-After (seconds) when it sends one, kept between 5 and 120 seconds.
+    static func retryAfter(_ response: HTTPURLResponse) -> TimeInterval {
+        let requested = response.value(forHTTPHeaderField: "Retry-After").flatMap { Double($0) } ?? 30
+        return min(max(requested, 5), 120)
     }
 }

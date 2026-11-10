@@ -23,6 +23,10 @@ import {
   translateLines,
   clearTranslationModels,
 } from "./translation.mjs";
+
+// Placeholders until the real pages are hosted. Replace both before the App Store submission (docs/STORE-CHECKLIST.md).
+const PRIVACY_URL = "https://example.com/TODO_PRIVACY_URL";
+const SUPPORT_URL = "https://example.com/TODO_SUPPORT_URL";
 const main = document.querySelector("main");
 const dialog = document.querySelector("dialog");
 document
@@ -125,11 +129,12 @@ function announce(message) {
 /* Settings ---------------------------------------------------------------- */
 
 function updateBrowserTheme() {
-  document.querySelector('meta[name="theme-color"]').content = getComputedStyle(
-    document.documentElement,
-  )
+  // Both theme-color metas (light and dark OS preference) follow the app's own theme.
+  const paper = getComputedStyle(document.documentElement)
     .getPropertyValue("--paper")
     .trim();
+  for (const meta of document.querySelectorAll('meta[name="theme-color"]'))
+    meta.content = paper;
 }
 matchMedia("(prefers-color-scheme: dark)").addEventListener(
   "change",
@@ -179,6 +184,7 @@ function songRow(song, index, action = "open-result", offline = false) {
   const minutes = `${Math.floor(song.duration / 60)}:${String(Math.floor(song.duration % 60)).padStart(2, "0")}`;
   return `<button class="song-row" data-action="${action}" data-index="${e(index)}">${cover(song)}<span class="song-info"><strong>${e(song.title)}</strong><span>${e(song.artist)}</span><small>${e(song.album)}</small></span><span class="song-duration ${offline ? "is-offline" : ""}">${offline ? `${icon("download")} Offline` : song.duration ? minutes : ""}</span>${icon("chevron")}</button>`;
 }
+let renderedPage = null;
 function render() {
   const active = document.activeElement;
   const inMain = main.contains(active);
@@ -206,6 +212,10 @@ function render() {
         : state.page === "settings"
           ? settingsView()
           : searchView();
+  // Page changes arrive with a soft rise; re-renders of the same page stay still.
+  if (renderedPage !== state.page) main.dataset.enter = "";
+  else delete main.dataset.enter;
+  renderedPage = state.page;
   const heading = main.querySelector("h1");
   if (heading) {
     heading.id = "page-heading";
@@ -427,7 +437,7 @@ function settingsView() {
   <section class="setting-section"><h2>${icon("download")} Storage</h2><label class="setting-row switch-row cache-setting" for="cache"><span>Save permitted lyrics offline<small>Only save lyrics and translations you’re permitted to keep.</small></span><span class="switch-target"><input id="cache" type="checkbox" role="switch" ${state.settings.cache ? "checked" : ""}></span></label><p class="storage-summary">${plural(saved, "song")} saved offline · ${plural(favorites, "favorite")}. Stored in this browser, separate from your iPhone library.${db.storage.persistent ? "" : " <strong>This browser is blocking storage, so changes last only until you close this tab.</strong>"}</p>
   ${modelList()}
   <div class="action-list"><button class="action-row" data-action="export-library">${icon("download")} Export library backup</button><button class="action-row" data-action="import-library">${icon("upload")} Import a backup</button><input type="file" id="import-file" accept="application/json,.json" hidden><button class="action-row" data-action="clear-models">${icon("languages")} Remove downloaded language models</button><button class="action-row" data-action="clear-cache">${icon("note")} Clear lyrics & translations</button><button class="action-row" data-action="clear-recent">${icon("clock")} Clear recent searches</button><button class="action-row danger" data-action="delete-all">${icon("close")} Delete library & history</button></div></section>
-  <details class="setting-section about-details"><summary>About Lyrica & privacy</summary><div class="about-content"><p>Search and metadata come from Apple’s iTunes API. Lyrics come from LRCLIB. Availability does not grant copyright or redistribution rights. Only paste or store material you’re authorized to use.</p><p>Spanish, Arabic, and French → English can run privately in your browser using downloadable OPUS-MT translation models. Choose the original language, then download its model when prompted (about 110–120 MB per language, plus a shared 23 MB engine). The default In context style translates related lines together to preserve meaning. Reader options lets you compare Line by line or retranslate older saved text. Compact models can still miss idioms, dialect and poetry. Speed and memory use depend on your phone. Models are saved in this browser and reused. Browsers may still clear site data after a long time unused (Safari does so after about a week unless Lyrica is added to your Home Screen); you can remove them above. Supported desktop browsers may use their built-in translator instead. Apple Translation is exclusive to the native iPhone app.</p><p>Queries go directly to Apple, and recording metadata goes directly to LRCLIB. Language models download from Hugging Face; your lyric text is processed locally and is not sent there. Lyrica has no analytics, accounts, server, paid API, or cloud sync. Only the application shell is cached automatically; lyric storage is opt-in. Clearing browser data removes your library, so export a backup first. Browser-managed translation models are managed by the browser.</p><a class="plain" href="https://github.com/Kerollosl/lyrica" target="_blank" rel="noopener">Explore the iPhone app and source ${icon("external")}</a></div></details></div>`;
+  <details class="setting-section about-details"><summary>About Lyrica & privacy</summary><div class="about-content"><p>Search and metadata come from Apple’s iTunes API. Lyrics come from LRCLIB. Availability does not grant copyright or redistribution rights. Only paste or store material you’re authorized to use.</p><p>Spanish, Arabic, and French → English can run privately in your browser using downloadable OPUS-MT translation models. Choose the original language, then download its model when prompted (about 110–120 MB per language, plus a shared 23 MB engine). The default In context style translates related lines together to preserve meaning. Reader options lets you compare Line by line or retranslate older saved text. Compact models can still miss idioms, dialect and poetry. Speed and memory use depend on your phone. Models are saved in this browser and reused. Browsers may still clear site data after a long time unused (Safari does so after about a week unless Lyrica is added to your Home Screen); you can remove them above. Supported desktop browsers may use their built-in translator instead. Apple Translation is exclusive to the native iPhone app.</p><p>Queries go directly to Apple, and recording metadata goes directly to LRCLIB. Language models download from Hugging Face; your lyric text is processed locally and is not sent there. Lyrica has no analytics, accounts, server, paid API, or cloud sync. Only the application shell is cached automatically; lyric storage is opt-in. Clearing browser data removes your library, so export a backup first. Browser-managed translation models are managed by the browser.</p><p><a href="${PRIVACY_URL}" target="_blank" rel="noopener">Privacy policy</a> · <a href="${SUPPORT_URL}" target="_blank" rel="noopener">Support</a></p><a class="plain" href="https://github.com/Kerollosl/lyrica" target="_blank" rel="noopener">Explore the iPhone app and source ${icon("external")}</a></div></details></div>`;
 }
 
 /* Search ------------------------------------------------------------------ */
@@ -1309,6 +1319,8 @@ document.addEventListener("click", async (event) => {
       state.reader.favorite = !state.reader.favorite;
       await persist();
       render();
+      if (state.reader.favorite)
+        document.querySelector(".favorite-button")?.classList.add("pop");
       // Offer offline storage once; afterwards a favorite is simply a bookmark.
       if (
         state.reader.favorite &&

@@ -30,12 +30,13 @@ struct ReaderView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let stacked = layout == .stacked || (layout == .automatic && (geometry.size.width < 375 || dynamicType.isAccessibilitySize))
+            // Two columns need room: stack below 600pt (every iPhone in portrait, narrow iPad splits) like the web app does.
+            let stacked = layout == .stacked || (layout == .automatic && (geometry.size.width < 600 || dynamicType.isAccessibilitySize))
             ScrollView {
                 // At accessibility sizes the stacked pickers would cover too much of the screen.
                 LazyVStack(alignment: .leading, spacing: 0, pinnedViews: dynamicType.isAccessibilitySize ? [] : [.sectionHeaders]) {
                     songHeader
-                        .padding(.horizontal, 20).padding(.top, 8).padding(.bottom, 16)
+                        .padding(.horizontal, 20).padding(.top, 12).padding(.bottom, 20)
                     Section {
                         readerContent(stacked: stacked)
                             .padding(.horizontal, 16).padding(.top, 12)
@@ -65,8 +66,11 @@ struct ReaderView: View {
                     }
                 } label: {
                     Image(systemName: model.isFavorite ? "heart.fill" : "heart")
+                        .contentTransition(.symbolEffect(.replace))
+                        .symbolEffect(.bounce, value: reduceMotion ? false : model.isFavorite)
                         .frame(minWidth: 44, minHeight: 44)
                 }
+                .sensoryFeedback(.success, trigger: model.isFavorite) { _, isFavorite in isFavorite }
                 .accessibilityLabel(model.isFavorite ? "Remove from favorites" : "Save to favorites")
                 .accessibilityValue(model.isFavorite ? "Saved" : "Not saved")
                 Button { showsOptions = true } label: {
@@ -169,16 +173,16 @@ struct ReaderView: View {
 
     @ViewBuilder
     private var lyricsRecoveryActions: some View {
-        Button("Paste lyrics") { showsManual = true }.buttonStyle(.borderedProminent).controlSize(.large)
+        Button("Paste lyrics") { showsManual = true }.buttonStyle(ProminentActionStyle())
         Button("Try again") { Task { await model.load(store: store, settings: settings) } }
             .font(.subheadline.weight(.semibold)).frame(minHeight: 44)
     }
 
     private var songHeader: some View {
-        HStack(alignment: .center, spacing: 16) {
-            ArtworkView(song: model.song, size: 64)
-            VStack(alignment: .leading, spacing: 5) {
-                Text(model.song.title).font(.headline).foregroundStyle(LyricaStyle.ink)
+        HStack(alignment: .center, spacing: 18) {
+            ArtworkView(song: model.song, size: 76)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(model.song.title).font(.title2.weight(.bold)).foregroundStyle(LyricaStyle.ink)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(model.song.artist).font(.subheadline).foregroundStyle(LyricaStyle.secondary)
                 Text(model.song.album).font(.caption).foregroundStyle(LyricaStyle.secondary)
@@ -217,9 +221,10 @@ struct ReaderView: View {
                         .environment(\.layoutDirection, .leftToRight)
                     }
                 }
-                .padding(.vertical, 8).padding(.horizontal, 10)
+                .padding(.vertical, 10).padding(.horizontal, 12)
                 .frame(minHeight: 44)
-                .background(selected ? LyricaStyle.accent.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: 6))
+                .background(selected ? LyricaStyle.accent.opacity(0.12) : .clear, in: RoundedRectangle(cornerRadius: LyricaStyle.rowRadius, style: .continuous))
+                .sensoryFeedback(.selection, trigger: selected) { _, isSelected in isSelected }
                 .contentShape(Rectangle())
                 // A tap highlights the pair; a long press still selects text for Copy, Look Up and Translate.
                 .onTapGesture { toggle(line) }
@@ -249,7 +254,7 @@ struct ReaderView: View {
     }
 
     private func toggle(_ line: ReaderLine) {
-        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
+        withAnimation(LyricaStyle.motion(LyricaStyle.spring, reduce: reduceMotion)) {
             if settings.hideTranslations {
                 if revealed.contains(line.index) { revealed.remove(line.index) } else { revealed.insert(line.index) }
             }
@@ -367,7 +372,7 @@ struct ReaderView: View {
                         Text("Detect automatically").tag("auto")
                         ForEach(languages.including(model.sourceLanguage ?? "es")) { Text($0.name).tag($0.id) }
                     }
-                    Text("If detection gets a short or multilingual song wrong, choose its main language.").font(.footnote).foregroundStyle(.secondary)
+                    Text("If detection gets a short or multilingual song wrong, choose its main language.").font(.footnote).foregroundStyle(LyricaStyle.secondary)
                 }
                 Section {
                     if model.document != nil {
