@@ -418,7 +418,13 @@ def test_reader_refinement(browser):
     reader_options(page).get_by_role("button", name="Paste or replace lyrics", exact=True).click()
     field.fill("Un nuevo comienzo\n\nCada palabra vuelve a casa")
     page.get_by_role("button", name="Use lyrics", exact=True).click()
-    page.wait_for_function("window.availabilityCalls === 1")
+    # wait_for_function(str) uses eval(), which the page CSP forbids; poll via evaluate instead.
+    for _ in range(100):
+        if page.evaluate("window.availabilityCalls") == 1:
+            break
+        page.wait_for_timeout(50)
+    else:
+        raise AssertionError("availabilityCalls never reached 1")
     expect(page.get_by_role("button", name="Use lyrics", exact=True)).to_be_disabled()
     page.locator("#dialog-form").evaluate("form => form.requestSubmit()")
     assert page.evaluate("window.availabilityCalls") == 1, "Repeated save started another translation operation"
