@@ -1,9 +1,10 @@
-const CACHE = "lyrica-shell-v9";
+const CACHE = "lyrica-shell-v10";
 const RUNTIME = "lyrica-translation-runtime-v1";
 const SHELL = [
   "./",
   "./index.html",
   "./style.css",
+  "./theme-init.js",
   "./app.mjs",
   "./icons.mjs",
   "./core.mjs",
